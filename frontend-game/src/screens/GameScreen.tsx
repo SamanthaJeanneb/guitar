@@ -45,9 +45,6 @@ export const GameScreen: React.FC = () => {
   const [playerWon, setPlayerWon] = useState<boolean | null>(null);
   const statsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const endHandledRef = useRef(false);
-  
-  // Determine if we're in multiplayer mode
-  const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
 
   useEffect(() => { scoreP1Ref.current = gameplay.scoreP1; }, [gameplay.scoreP1]);
   useEffect(() => { scoreP2Ref.current = gameplay.scoreP2; }, [gameplay.scoreP2]);
@@ -197,6 +194,7 @@ export const GameScreen: React.FC = () => {
       const stats = engine.getStats();
       
       // Use synchronized values in multiplayer, local values in single player
+      const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
       
       let currentBearProgress: number;
       let currentManProgress: number;
@@ -217,7 +215,6 @@ export const GameScreen: React.FC = () => {
         currentBearProgress = stats.bearProgress;
         currentManProgress = stats.manProgress;
       }
-      
       const currentGameOver = isMultiplayer ? gameplay.synchronizedGameOver : stats.gameOver;
       const currentGameResult = isMultiplayer ? gameplay.synchronizedGameResult : stats.gameResult;
       
@@ -238,19 +235,23 @@ export const GameScreen: React.FC = () => {
           let currentPlayerWon = false;
           
           if (isMultiplayer) {
-            // In multiplayer, determine win condition based on scores
+            // In multiplayer, determine win condition based on character assignment
             const localPlayer = lobby.side === 'blue' ? 2 : 1;
-            const localPlayerScore = localPlayer === 1 ? gameplay.scoreP1 : gameplay.scoreP2;
-            const opponentScore = localPlayer === 1 ? gameplay.scoreP2 : gameplay.scoreP1;
+            const localPlayerCharacter = localPlayer === 1 ? players.p1.characterId : players.p2.characterId;
             
-            // Winner is determined by higher score
-            currentPlayerWon = localPlayerScore > opponentScore;
+            if (currentGameResult === 'bear_escaped') {
+              // Bear escaped - bear player wins
+              currentPlayerWon = localPlayerCharacter === 'bear';
+            } else if (currentGameResult === 'man_caught') {
+              // Man caught the bear - man player wins
+              currentPlayerWon = localPlayerCharacter === 'man';
+            }
             
             setPlayerWon(currentPlayerWon);
             console.log('Multiplayer game result:', {
+              gameResult: currentGameResult,
               localPlayer,
-              localPlayerScore,
-              opponentScore,
+              localPlayerCharacter,
               playerWon: currentPlayerWon
             });
           } else {
@@ -367,10 +368,7 @@ export const GameScreen: React.FC = () => {
   
   
   const CharacterPanel: React.FC<{ player: 1 | 2 }> = ({ player }) => {
-    // In multiplayer, use lobby scores; in single player, use local scores
-    const score = isMultiplayer 
-      ? (player === 1 ? gameplay.scoreP1 : gameplay.scoreP2) // These are synced from lobby
-      : (player === 1 ? gameplay.scoreP1 : gameplay.scoreP2);
+    const score = player === 1 ? gameplay.scoreP1 : gameplay.scoreP2;
     const combo = player === 1 ? gameplay.comboP1 : gameplay.comboP2;
     const accuracy = player === 1 ? gameplay.accuracyP1 : gameplay.accuracyP2;
     const characterId = player === 1 ? players.p1.characterId : players.p2.characterId;
@@ -460,7 +458,7 @@ export const GameScreen: React.FC = () => {
             >🧍</div>
           </div>
           <div className="flex justify-between text-[10px] mt-1 font-mono">
-            {isMultiplayer ? (
+            {lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2 ? (
               <>
                 <span className="pixel-glow-green">RED {bearProgress.toFixed(1)}%</span>
                 {bearBoost && <span className="pixel-glow-yellow animate-pulse">BOOST!</span>}
@@ -476,10 +474,11 @@ export const GameScreen: React.FC = () => {
           </div>
           {gameResult && (
             <div className="text-center mt-2 text-xs pixel-glow-pink">
-              {isMultiplayer 
-                ? 'SONG COMPLETE!' 
-                : (gameResult === 'bear_escaped' ? 'BEAR ESCAPED!' : 'MAN CAUGHT THE BEAR!')
-              }
+              {lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2 ? (
+                'SONG COMPLETE!'
+              ) : (
+                gameResult === 'bear_escaped' ? 'BEAR ESCAPED!' : 'MAN CAUGHT THE BEAR!'
+              )}
             </div>
           )}
         </div>
@@ -569,9 +568,9 @@ export const GameScreen: React.FC = () => {
               {playerWon ? 'VICTORY!' : 'DEFEAT!'}
             </h2>
             <p className={`text-2xl mb-6 ${playerWon ? 'pixel-glow-green' : 'pixel-glow-red'}`}>
-              {playerWon 
-                ? 'HIGHER SCORE! YOU WIN!' 
-                : 'LOWER SCORE! YOU LOSE!'
+              {gameResult === 'bear_escaped' 
+                ? (playerWon ? 'BEAR ESCAPED! YOU WIN!' : 'BEAR ESCAPED! YOU LOSE!')
+                : (playerWon ? 'MAN CAUGHT THE BEAR! YOU WIN!' : 'MAN CAUGHT THE BEAR! YOU LOSE!')
               }
             </p>
             <div className="text-sm pixel-glow-purple mb-4">
