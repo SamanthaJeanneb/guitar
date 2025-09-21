@@ -67,9 +67,12 @@ export const GameScreen: React.FC = () => {
   }, []);
 
   const handleNoteResult = useCallback((result: { judgment: Judgment; note: Note; player: number; accuracy: number }) => {
-  if (!lobby.side) { return; } // side not chosen yet (shouldn't happen in GameScreen but guard)
-  const player = lobby.side === 'blue' ? 2 : 1; // authoritative local side
     const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
+    
+    // In single player mode, lobby.side is undefined, so use player 1
+    // In multiplayer mode, lobby.side determines the player
+    if (isMultiplayer && !lobby.side) return; // ignore input until side is assigned by hosting/joining
+    const player = isMultiplayer ? (lobby.side === 'blue' ? 2 : 1) : 1;
     const currentScore = player === 1 ? scoreP1Ref.current : scoreP2Ref.current;
     const currentCombo = player === 1 ? comboP1Ref.current : comboP2Ref.current;
     const newScore = currentScore + result.judgment.score;
