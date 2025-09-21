@@ -213,7 +213,9 @@ export const GameScreen: React.FC = () => {
           redScore: gameplay.scoreP1,
           blueScore: gameplay.scoreP2,
           redPlayer: lobby.side === 'red' ? 'local' : 'remote',
-          bluePlayer: lobby.side === 'blue' ? 'local' : 'remote'
+          bluePlayer: lobby.side === 'blue' ? 'local' : 'remote',
+          mode: lobby.mode,
+          connectedP2: lobby.connectedP2
         });
         
         // Convert scores to progress (0-100)
@@ -225,7 +227,9 @@ export const GameScreen: React.FC = () => {
         console.log('Multiplayer Progress Calculated', {
           bearProgress: currentBearProgress,
           manProgress: currentManProgress,
-          maxScoreForProgress
+          maxScoreForProgress,
+          redScore: gameplay.scoreP1,
+          blueScore: gameplay.scoreP2
         });
       } else {
         // Single player uses engine stats
