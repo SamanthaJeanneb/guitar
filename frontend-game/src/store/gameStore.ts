@@ -186,27 +186,27 @@ export const useGameStore = create<GameState>((set, get) => ({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const row: any = rowRaw;
       set((state) => ({
-        lobby: { ...state.lobby, connectedP2: !!row?.red && !!row?.blue, redPresent: !!row?.red, bluePresent: !!row?.blue, side: state.lobby.side, p1Ready: row?.red_ready ?? state.lobby.p1Ready, p2Ready: row?.blue_ready ?? state.lobby.p2Ready },
+  lobby: { ...state.lobby, connectedP2: !!row?.red && !!row?.blue, redPresent: !!row?.red, bluePresent: !!row?.blue, side: state.lobby.side, p1Ready: row?.redReady ?? state.lobby.p1Ready, p2Ready: row?.blueReady ?? state.lobby.p2Ready },
       }));
       if (row?.started && get().currentScreen !== 'GAME') { set({ currentScreen: 'GAME' }); }
       if (get().lobby.side === 'red' && row) {
-        const localSongId = get().song?.id; const remoteSongId = row.song_id ?? null;
+  const localSongId = get().song?.id; const remoteSongId = row.songId ?? null;
         if (localSongId && !remoteSongId) { const c = getConn(); if (c && get().lobby.code) { try { LobbyApi.setSong(c, get().lobby.code!, localSongId); } catch (e) { console.warn('setSong (host sync) failed', e); } } }
       }
       if (row) {
         set((state) => ({
           players: {
-            p1: { ...state.players.p1, characterId: state.lobby.side === 'blue' ? (row.red_char ?? state.players.p1.characterId) : state.players.p1.characterId, ready: state.players.p1.ready },
-            p2: { ...state.players.p2, characterId: state.lobby.side !== 'blue' ? (row.blue_char ?? state.players.p2.characterId) : state.players.p2.characterId, ready: state.players.p2.ready },
+            p1: { ...state.players.p1, characterId: state.lobby.side === 'blue' ? (row.redChar ?? state.players.p1.characterId) : state.players.p1.characterId, ready: state.players.p1.ready },
+            p2: { ...state.players.p2, characterId: state.lobby.side !== 'blue' ? (row.blueChar ?? state.players.p2.characterId) : state.players.p2.characterId, ready: state.players.p2.ready },
           },
           gameplay: { 
             ...state.gameplay, 
-            scoreP1: row.red_score ?? state.gameplay.scoreP1, 
-            scoreP2: row.blue_score ?? state.gameplay.scoreP2,
-            bearProgress: row.bear_progress ?? state.gameplay.bearProgress,
-            manProgress: row.man_progress ?? state.gameplay.manProgress,
-            synchronizedGameOver: row.game_over ?? state.gameplay.synchronizedGameOver,
-            synchronizedGameResult: row.game_result as 'bear_escaped' | 'man_caught' | null ?? state.gameplay.synchronizedGameResult,
+            scoreP1: row.redScore ?? state.gameplay.scoreP1, 
+            scoreP2: row.blueScore ?? state.gameplay.scoreP2,
+            bearProgress: row.bearProgress ?? state.gameplay.bearProgress,
+            manProgress: row.manProgress ?? state.gameplay.manProgress,
+            synchronizedGameOver: row.gameOver ?? state.gameplay.synchronizedGameOver,
+            synchronizedGameResult: row.gameResult as 'bear_escaped' | 'man_caught' | null ?? state.gameplay.synchronizedGameResult,
           },
         }));
       }
@@ -228,22 +228,22 @@ export const useGameStore = create<GameState>((set, get) => ({
     const unsub = subscribeLobby(code, (rowRaw) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const row: any = rowRaw;
-      set((state) => ({ lobby: { ...state.lobby, connectedP2: !!row?.red && !!row?.blue, redPresent: !!row?.red, bluePresent: !!row?.blue, side: state.lobby.side, p1Ready: row?.red_ready ?? state.lobby.p1Ready, p2Ready: row?.blue_ready ?? state.lobby.p2Ready } }));
+  set((state) => ({ lobby: { ...state.lobby, connectedP2: !!row?.red && !!row?.blue, redPresent: !!row?.red, bluePresent: !!row?.blue, side: state.lobby.side, p1Ready: row?.redReady ?? state.lobby.p1Ready, p2Ready: row?.blueReady ?? state.lobby.p2Ready } }));
       if (row?.started && get().currentScreen !== 'GAME') { set({ currentScreen: 'GAME' }); }
       if (row) {
         set((state) => ({
           players: {
-            p1: { ...state.players.p1, characterId: state.lobby.side === 'blue' ? (row.red_char ?? state.players.p1.characterId) : state.players.p1.characterId, ready: state.players.p1.ready },
-            p2: { ...state.players.p2, characterId: state.lobby.side !== 'blue' ? (row.blue_char ?? state.players.p2.characterId) : state.players.p2.characterId, ready: state.players.p2.ready },
+            p1: { ...state.players.p1, characterId: state.lobby.side === 'blue' ? (row.redChar ?? state.players.p1.characterId) : state.players.p1.characterId, ready: state.players.p1.ready },
+            p2: { ...state.players.p2, characterId: state.lobby.side !== 'blue' ? (row.blueChar ?? state.players.p2.characterId) : state.players.p2.characterId, ready: state.players.p2.ready },
           },
           gameplay: { 
             ...state.gameplay, 
-            scoreP1: row.red_score ?? state.gameplay.scoreP1, 
-            scoreP2: row.blue_score ?? state.gameplay.scoreP2,
-            bearProgress: row.bear_progress ?? state.gameplay.bearProgress,
-            manProgress: row.man_progress ?? state.gameplay.manProgress,
-            synchronizedGameOver: row.game_over ?? state.gameplay.synchronizedGameOver,
-            synchronizedGameResult: row.game_result as 'bear_escaped' | 'man_caught' | null ?? state.gameplay.synchronizedGameResult,
+            scoreP1: row.redScore ?? state.gameplay.scoreP1, 
+            scoreP2: row.blueScore ?? state.gameplay.scoreP2,
+            bearProgress: row.bearProgress ?? state.gameplay.bearProgress,
+            manProgress: row.manProgress ?? state.gameplay.manProgress,
+            synchronizedGameOver: row.gameOver ?? state.gameplay.synchronizedGameOver,
+            synchronizedGameResult: row.gameResult as 'bear_escaped' | 'man_caught' | null ?? state.gameplay.synchronizedGameResult,
           },
         }));
       }
