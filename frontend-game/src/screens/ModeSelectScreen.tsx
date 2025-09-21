@@ -66,12 +66,6 @@ export const ModeSelectScreen: React.FC = () => {
       description: 'Learn the game controls',
       action: () => {playSfx(selection, 3.0); setScreen('HOW_TO_PLAY')}
     },
-    { 
-      id: 'settings', 
-      label: 'SETTINGS', 
-      description: 'Adjust game options',
-      action: () => {playSfx(selection, 3.0); setScreen('SETTINGS')}
-    },
   ], [setMode, setScreen]);
   
   useEffect(() => {

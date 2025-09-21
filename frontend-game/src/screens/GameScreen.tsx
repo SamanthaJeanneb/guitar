@@ -67,8 +67,9 @@ export const GameScreen: React.FC = () => {
   }, []);
 
   const handleNoteResult = useCallback((result: { judgment: Judgment; note: Note; player: number; accuracy: number }) => {
-  if (!lobby.side) { return; } // side not chosen yet (shouldn't happen in GameScreen but guard)
-  const player = lobby.side === 'blue' ? 2 : 1; // authoritative local side
+  // In single player mode, lobby.side is undefined, so use the player from the result
+  // In multiplayer mode, lobby.side determines the authoritative local side
+  const player = lobby.side ? (lobby.side === 'blue' ? 2 : 1) : result.player;
     const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
     const currentScore = player === 1 ? scoreP1Ref.current : scoreP2Ref.current;
     const currentCombo = player === 1 ? comboP1Ref.current : comboP2Ref.current;
@@ -119,8 +120,10 @@ export const GameScreen: React.FC = () => {
 
   const handleInput = useCallback((inputEvent: InputEvent) => {
   if (isPaused || !gameEngineRef.current) return;
-  if (!lobby.side) return; // ignore input until side is assigned by hosting/joining
-  const localPlayer = lobby.side === 'blue' ? 2 : 1;
+  
+  // In single player mode, lobby.side is undefined, so default to player 1
+  // In multiplayer mode, lobby.side determines the player
+  const localPlayer = lobby.side ? (lobby.side === 'blue' ? 2 : 1) : 1;
     if (inputEvent.type === 'hit') {
       const result = gameEngineRef.current.handleInput(inputEvent.lane, inputEvent.type, localPlayer);
       if (result.judgment) {
@@ -324,9 +327,12 @@ export const GameScreen: React.FC = () => {
       gameOver: false,
     });
     
-    // Restart the game engine
+    // Restart the game engine - use the same mode detection logic as the main useEffect
     if (gameEngineRef.current && song) {
-      gameEngineRef.current = new GameEngine(canvasRef.current!, window.gameAudioContext!, window.gameGainNode!);
+      const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
+      gameEngineRef.current = isMultiplayer 
+        ? new MultiplayerGameEngine(canvasRef.current!, window.gameAudioContext!, window.gameGainNode!)
+        : new GameEngine(canvasRef.current!, window.gameAudioContext!, window.gameGainNode!);
       gameEngineRef.current.setNoteResultCallback(handleNoteResult);
       gameEngineRef.current.start(song.id);
     }
