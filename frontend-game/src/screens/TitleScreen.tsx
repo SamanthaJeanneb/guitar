@@ -53,7 +53,6 @@ export const TitleScreen: React.FC = () => {
   
   return (
     <div className="min-h-screen flex flex-col items-center justify-center relative">
-      
       <div className="game-container text-center">
         {/* Main Title */}
         <div className="mb-16">
@@ -64,29 +63,23 @@ export const TitleScreen: React.FC = () => {
             ARCADE EDITION
           </div>
         </div>
-        
         {/* Start Prompt */}
-          <div className="pixel mb-8">
-            <p className="text-2xl pixel-glow-pink mb-8" style={{ color: '#960018'}}>
-              PRESS ENTER TO START
-            </p>
-            <button className="nes-btn is-error text-lg px-8" onClick={() => setScreen('MODE_SELECT')}>
-              ENTER
-            </button>
-          </div>
-        
+        <div className="pixel mb-8">
+          <p className="text-2xl pixel-glow-pink mb-8" style={{ color: '#960018'}}>
+            PRESS ENTER TO START
+          </p>
+          <button className="nes-btn is-error text-lg px-8" onClick={() => setScreen('MODE_SELECT')}>
+            ENTER
+          </button>
+        </div>
+        {/* Man and Bear Images Below Button */}
+  <div className="flex items-end justify-center gap-52 mt-2 mb-8">
+          <img src="/images/man.gif" alt="Man" style={{ width: 150 }} />
+          <img src="/images/bear.gif" alt="Bear" style={{ width: 260 }} />
+        </div>
         {/* Arcade UI Elements */}
         <div className="absolute top-8 left-8 pixel-glow-purple text-sm">
           INSERT COIN
-        </div>
-        <div className="absolute top-8 right-8 pixel-glow-pink text-sm"  style={{ color: '#960018'}}>
-          HIGH SCORE 999999
-        </div>
-        <div className="absolute bottom-8 left-8 pixel-glow-pink text-sm"  style={{ color: '#960018'}}>
-          1 PLAYER
-        </div>
-        <div className="absolute bottom-8 right-8 pixel-glow-purple text-sm">
-          COPYRIGHT 2024 ARCADE
         </div>
       </div>
     </div>

@@ -428,16 +428,19 @@ export const GameScreen: React.FC = () => {
                 style={{ width: `${Math.min(100, manProgress)}%` }}
               ></div>
             </div>
-            {/* Bear icon */}
-            <div
-              className="absolute top-1/2 -translate-y-1/2 text-xs"
-              style={{ left: `calc(${Math.min(100, bearProgress)}% - 12px)` }}
-            >🐻</div>
-            {/* Man icon */}
-            <div
-              className="absolute top-1/2 -translate-y-1/2 text-xs"
-              style={{ left: `calc(${Math.min(100, manProgress)}% - 8px)` }}
-            >🧍</div>
+          </div>
+          {/* Bear and Man overlay icons */}
+          <div
+            className="absolute z-30"
+            style={{ left: `calc(${Math.min(100, bearProgress)}% - 32px)`, top: '-48px' }}
+          >
+            <img src="/images/bear.gif" alt="Bear" style={{ width: 64, height: 64 }} />
+          </div>
+          <div
+            className="absolute z-30"
+            style={{ left: `calc(${Math.min(100, manProgress)}% - 32px)`, top: '-48px' }}
+          >
+            <img src="/images/man.gif" alt="Man" style={{ width: 64, height: 84 }} />
           </div>
           <div className="flex justify-between text-[10px] mt-1 font-mono">
             <span className="pixel-glow-green">BEAR {bearProgress.toFixed(1)}%</span>
