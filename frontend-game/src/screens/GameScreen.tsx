@@ -46,8 +46,14 @@ export const GameScreen: React.FC = () => {
   const statsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const endHandledRef = useRef(false);
 
-  useEffect(() => { scoreP1Ref.current = gameplay.scoreP1; }, [gameplay.scoreP1]);
-  useEffect(() => { scoreP2Ref.current = gameplay.scoreP2; }, [gameplay.scoreP2]);
+  useEffect(() => { 
+    console.log('[ScoreP1Update]', { old: scoreP1Ref.current, new: gameplay.scoreP1 });
+    scoreP1Ref.current = gameplay.scoreP1; 
+  }, [gameplay.scoreP1]);
+  useEffect(() => { 
+    console.log('[ScoreP2Update]', { old: scoreP2Ref.current, new: gameplay.scoreP2 });
+    scoreP2Ref.current = gameplay.scoreP2; 
+  }, [gameplay.scoreP2]);
   useEffect(() => { comboP1Ref.current = gameplay.comboP1; }, [gameplay.comboP1]);
   useEffect(() => { comboP2Ref.current = gameplay.comboP2; }, [gameplay.comboP2]);
 
@@ -67,20 +73,45 @@ export const GameScreen: React.FC = () => {
   }, []);
 
   const handleNoteResult = useCallback((result: { judgment: Judgment; note: Note; player: number; accuracy: number }) => {
-  const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
-  if (isMultiplayer && !lobby.side) { return; } // side not chosen yet (shouldn't happen in GameScreen but guard)
-  const player = isMultiplayer ? (lobby.side === 'blue' ? 2 : 1) : 1; // authoritative local side
+    const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
+    
+    // In single player mode, lobby.side is undefined, so use player 1
+    // In multiplayer mode, lobby.side determines the player
+    if (isMultiplayer && !lobby.side) { return; } // ignore input until side is assigned by hosting/joining
+    const player = isMultiplayer ? (lobby.side === 'blue' ? 2 : 1) : 1;
+    
+    console.log('[HandleNoteResult]', {
+      isMultiplayer,
+      lobbySide: lobby.side,
+      determinedPlayer: player,
+      judgment: result.judgment.type,
+      score: result.judgment.score,
+      currentScoreP1: scoreP1Ref.current,
+      currentScoreP2: scoreP2Ref.current
+    });
     const currentScore = player === 1 ? scoreP1Ref.current : scoreP2Ref.current;
     const currentCombo = player === 1 ? comboP1Ref.current : comboP2Ref.current;
     const newScore = currentScore + result.judgment.score;
     const newCombo = result.judgment.type !== 'Miss' ? currentCombo + 1 : 0;
+    
+    console.log('[ScoreCalculation]', {
+      player,
+      currentScore,
+      currentCombo,
+      judgmentScore: result.judgment.score,
+      newScore,
+      newCombo,
+      isMultiplayer
+    });
 
     if (isMultiplayer) {
       // Multiplayer: DB is source of truth for scores. Only update combo/accuracy locally.
-      updateGameplay({
+      const updateData = {
         [player === 1 ? 'comboP1' : 'comboP2']: newCombo,
         [player === 1 ? 'accuracyP1' : 'accuracyP2']: result.accuracy,
-      });
+      };
+      console.log('[MultiplayerUpdate]', updateData);
+      updateGameplay(updateData);
       if (result.judgment.type !== 'Miss') {
         const conn = getConn();
         if (conn && lobby.code) {
@@ -101,11 +132,13 @@ export const GameScreen: React.FC = () => {
       }
     } else {
       // Solo mode: update everything locally.
-      updateGameplay({
+      const updateData = {
         [player === 1 ? 'scoreP1' : 'scoreP2']: newScore,
         [player === 1 ? 'comboP1' : 'comboP2']: newCombo,
         [player === 1 ? 'accuracyP1' : 'accuracyP2']: result.accuracy,
-      });
+      };
+      console.log('[SoloUpdate]', updateData);
+      updateGameplay(updateData);
     }
 
     // Popup feedback (still shows immediately)
@@ -215,7 +248,13 @@ export const GameScreen: React.FC = () => {
           redPlayer: lobby.side === 'red' ? 'local' : 'remote',
           bluePlayer: lobby.side === 'blue' ? 'local' : 'remote',
           mode: lobby.mode,
-          connectedP2: lobby.connectedP2
+          connectedP2: lobby.connectedP2,
+          gameplayState: {
+            scoreP1: gameplay.scoreP1,
+            scoreP2: gameplay.scoreP2,
+            comboP1: gameplay.comboP1,
+            comboP2: gameplay.comboP2
+          }
         });
         
         // Convert scores to progress (0-100)
