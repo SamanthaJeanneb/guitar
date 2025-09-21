@@ -4,5 +4,17 @@
     "title": "Hello Waves",
     "bpm": 120,
     "difficulty": "Medium"
+  },
+  {
+    "id": "Disturbia",
+    "title": "DISTURBIA",
+    "bpm": 120,
+    "difficulty": "Medium"
+  },
+  {
+    "id": "Gnarly",
+    "title": "GNARLY",
+    "bpm": 120,
+    "difficulty": "Medium"
   }
 ]
