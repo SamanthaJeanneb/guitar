@@ -46,14 +46,8 @@ export const GameScreen: React.FC = () => {
   const statsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const endHandledRef = useRef(false);
 
-  useEffect(() => { 
-    console.log('[ScoreP1Update]', { old: scoreP1Ref.current, new: gameplay.scoreP1 });
-    scoreP1Ref.current = gameplay.scoreP1; 
-  }, [gameplay.scoreP1]);
-  useEffect(() => { 
-    console.log('[ScoreP2Update]', { old: scoreP2Ref.current, new: gameplay.scoreP2 });
-    scoreP2Ref.current = gameplay.scoreP2; 
-  }, [gameplay.scoreP2]);
+  useEffect(() => { scoreP1Ref.current = gameplay.scoreP1; }, [gameplay.scoreP1]);
+  useEffect(() => { scoreP2Ref.current = gameplay.scoreP2; }, [gameplay.scoreP2]);
   useEffect(() => { comboP1Ref.current = gameplay.comboP1; }, [gameplay.comboP1]);
   useEffect(() => { comboP2Ref.current = gameplay.comboP2; }, [gameplay.comboP2]);
 
@@ -73,28 +67,13 @@ export const GameScreen: React.FC = () => {
   }, []);
 
   const handleNoteResult = useCallback((result: { judgment: Judgment; note: Note; player: number; accuracy: number }) => {
+  if (!lobby.side) { return; } // side not chosen yet (shouldn't happen in GameScreen but guard)
+  const player = lobby.side === 'blue' ? 2 : 1; // authoritative local side
     const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
-    
-    // In single player mode, lobby.side is undefined, so use player 1
-    // In multiplayer mode, lobby.side determines the player
-    if (isMultiplayer && !lobby.side) return; // ignore input until side is assigned by hosting/joining
-    const player = isMultiplayer ? (lobby.side === 'blue' ? 2 : 1) : 1;
     const currentScore = player === 1 ? scoreP1Ref.current : scoreP2Ref.current;
     const currentCombo = player === 1 ? comboP1Ref.current : comboP2Ref.current;
     const newScore = currentScore + result.judgment.score;
     const newCombo = result.judgment.type !== 'Miss' ? currentCombo + 1 : 0;
-    
-    console.log('[HandleNoteResult]', {
-      isMultiplayer,
-      lobbySide: lobby.side,
-      determinedPlayer: player,
-      judgment: result.judgment.type,
-      score: result.judgment.score,
-      currentScore,
-      newScore,
-      currentCombo,
-      newCombo
-    });
 
     if (isMultiplayer) {
       // Multiplayer: DB is source of truth for scores. Only update combo/accuracy locally.
@@ -107,14 +86,7 @@ export const GameScreen: React.FC = () => {
         if (conn && lobby.code) {
           try {
             LobbyApi.setScore(conn, lobby.code, newScore);
-            console.log('[ScorePush]', { 
-              code: lobby.code, 
-              player, 
-              newScore, 
-              judgment: result.judgment.type,
-              lane: result.note?.lane,
-              side: lobby.side
-            });
+            console.log('[ScorePush]', { code: lobby.code, player, newScore });
           } catch (e) {
             console.warn('[ScorePushError]', { code: lobby.code, player, attempted: newScore, error: e });
           }
@@ -223,40 +195,8 @@ export const GameScreen: React.FC = () => {
       
       // Use synchronized values in multiplayer, local values in single player
       const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
-      
-      let currentBearProgress: number;
-      let currentManProgress: number;
-      
-      if (isMultiplayer) {
-        // In multiplayer, use scores to determine bear vs man progress
-        // Bear player (red) vs Man player (blue)
-        console.log('Multiplayer Progress Debug', {
-          redScore: gameplay.scoreP1,
-          blueScore: gameplay.scoreP2,
-          redPlayer: lobby.side === 'red' ? 'local' : 'remote',
-          bluePlayer: lobby.side === 'blue' ? 'local' : 'remote',
-          mode: lobby.mode,
-          connectedP2: lobby.connectedP2
-        });
-        
-        // Convert scores to progress (0-100)
-        // Use a reasonable max score for conversion (e.g., 10000 points = 100% progress)
-        const maxScoreForProgress = 10000;
-        currentBearProgress = Math.min(100, (gameplay.scoreP1 / maxScoreForProgress) * 100);
-        currentManProgress = Math.min(100, (gameplay.scoreP2 / maxScoreForProgress) * 100);
-        
-        console.log('Multiplayer Progress Calculated', {
-          bearProgress: currentBearProgress,
-          manProgress: currentManProgress,
-          maxScoreForProgress,
-          redScore: gameplay.scoreP1,
-          blueScore: gameplay.scoreP2
-        });
-      } else {
-        // Single player uses engine stats
-        currentBearProgress = stats.bearProgress;
-        currentManProgress = stats.manProgress;
-      }
+      const currentBearProgress = isMultiplayer ? gameplay.bearProgress : stats.bearProgress;
+      const currentManProgress = isMultiplayer ? gameplay.manProgress : stats.manProgress;
       const currentGameOver = isMultiplayer ? gameplay.synchronizedGameOver : stats.gameOver;
       const currentGameResult = isMultiplayer ? gameplay.synchronizedGameResult : stats.gameResult;
       
@@ -500,27 +440,13 @@ export const GameScreen: React.FC = () => {
             >🧍</div>
           </div>
           <div className="flex justify-between text-[10px] mt-1 font-mono">
-            {lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2 ? (
-              <>
-                <span className="pixel-glow-green">RED {bearProgress.toFixed(1)}%</span>
-                {bearBoost && <span className="pixel-glow-yellow animate-pulse">BOOST!</span>}
-                <span className="pixel-glow-red">BLUE {manProgress.toFixed(1)}%</span>
-              </>
-            ) : (
-              <>
-                <span className="pixel-glow-green">BEAR {bearProgress.toFixed(1)}%</span>
-                {bearBoost && <span className="pixel-glow-yellow animate-pulse">BOOST!</span>}
-                <span className="pixel-glow-red">MAN {manProgress.toFixed(1)}%</span>
-              </>
-            )}
+            <span className="pixel-glow-green">BEAR {bearProgress.toFixed(1)}%</span>
+            {bearBoost && <span className="pixel-glow-yellow animate-pulse">BOOST!</span>}
+            <span className="pixel-glow-red">MAN {manProgress.toFixed(1)}%</span>
           </div>
           {gameResult && (
             <div className="text-center mt-2 text-xs pixel-glow-pink">
-              {lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2 ? (
-                'SONG COMPLETE!'
-              ) : (
-                gameResult === 'bear_escaped' ? 'BEAR ESCAPED!' : 'MAN CAUGHT THE BEAR!'
-              )}
+              {gameResult === 'bear_escaped' ? 'BEAR ESCAPED!' : 'MAN CAUGHT THE BEAR!'}
             </div>
           )}
         </div>
