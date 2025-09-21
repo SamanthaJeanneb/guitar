@@ -97,6 +97,7 @@ export const GameScreen: React.FC = () => {
       // Update the multiplayer engine with the new score for chase mechanics
       if (gameEngineRef.current && 'updatePlayerScore' in gameEngineRef.current) {
         (gameEngineRef.current as any).updatePlayerScore(player, newScore);
+        console.log('[GameScreen] Updated multiplayer engine score', { player, newScore });
       }
     } else {
       // Solo mode: update everything locally.
@@ -192,6 +193,10 @@ export const GameScreen: React.FC = () => {
     if (isMultiplayer && 'setPlayerCharacter' in gameEngineRef.current) {
       (gameEngineRef.current as any).setPlayerCharacter(1, players.p1.characterId || 'bear');
       (gameEngineRef.current as any).setPlayerCharacter(2, players.p2.characterId || 'man');
+      console.log('[GameScreen] Character assignments set', { 
+        p1Character: players.p1.characterId || 'bear', 
+        p2Character: players.p2.characterId || 'man' 
+      });
     }
     
   // Setup input handling
@@ -214,6 +219,10 @@ export const GameScreen: React.FC = () => {
       if (isMultiplayer && gameEngineRef.current && 'updatePlayerScore' in gameEngineRef.current) {
         (gameEngineRef.current as any).updatePlayerScore(1, gameplay.scoreP1);
         (gameEngineRef.current as any).updatePlayerScore(2, gameplay.scoreP2);
+        console.log('[GameScreen] Updated multiplayer engine with synchronized scores', { 
+          p1Score: gameplay.scoreP1, 
+          p2Score: gameplay.scoreP2 
+        });
       }
       
       setBearProgress(currentBearProgress);
@@ -351,6 +360,17 @@ export const GameScreen: React.FC = () => {
         ? new MultiplayerGameEngine(canvasRef.current!, window.gameAudioContext!, window.gameGainNode!)
         : new GameEngine(canvasRef.current!, window.gameAudioContext!, window.gameGainNode!);
       gameEngineRef.current.setNoteResultCallback(handleNoteResult);
+      
+      // Set character assignments for multiplayer engine
+      if (isMultiplayer && 'setPlayerCharacter' in gameEngineRef.current) {
+        (gameEngineRef.current as any).setPlayerCharacter(1, players.p1.characterId || 'bear');
+        (gameEngineRef.current as any).setPlayerCharacter(2, players.p2.characterId || 'man');
+        console.log('[GameScreen] Character assignments set in restart', { 
+          p1Character: players.p1.characterId || 'bear', 
+          p2Character: players.p2.characterId || 'man' 
+        });
+      }
+      
       gameEngineRef.current.start(song.id);
     }
   };
