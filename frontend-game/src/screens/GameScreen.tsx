@@ -63,27 +63,30 @@ export const GameScreen: React.FC = () => {
   }, []);
 
   const handleNoteResult = useCallback((result: { judgment: Judgment; note: Note; player: number; accuracy: number }) => {
-    const player = result.player;
-    const currentScore = player === 1 ? scoreP1Ref.current : scoreP2Ref.current;
-    const currentCombo = player === 1 ? comboP1Ref.current : comboP2Ref.current;
+    // Determine which side this browser controls (host -> red/P1, join -> blue/P2)
+    const localPlayer = lobby.side === 'blue' ? 2 : 1;
+    if (result.player !== localPlayer) {
+      // Ignore any engine callbacks that aren't for our local side; remote side comes from DB subscription
+      return;
+    }
 
+    const currentScore = localPlayer === 1 ? scoreP1Ref.current : scoreP2Ref.current;
+    const currentCombo = localPlayer === 1 ? comboP1Ref.current : comboP2Ref.current;
     const newScore = currentScore + result.judgment.score;
     const newCombo = result.judgment.type !== 'Miss' ? currentCombo + 1 : 0;
 
     updateGameplay({
-      [`scoreP${player}`]: newScore,
-      [`comboP${player}`]: newCombo,
-      [`accuracyP${player}`]: result.accuracy,
+      [localPlayer === 1 ? 'scoreP1' : 'scoreP2']: newScore,
+      [localPlayer === 1 ? 'comboP1' : 'comboP2']: newCombo,
+      [localPlayer === 1 ? 'accuracyP1' : 'accuracyP2']: result.accuracy,
     });
 
     const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
     if (isMultiplayer && lobby.code && result.judgment.type !== 'Miss') {
       const conn = getConn();
-      const localPlayer = lobby.side === 'blue' ? 2 : 1; // Determine which score we are allowed to push
-      if (result.player === localPlayer && conn) {
+      if (conn) {
         try {
           LobbyApi.setScore(conn, lobby.code, newScore);
-          // Debug trace: remove later
           console.log('[ScoreSync] pushed', { code: lobby.code, localPlayer, newScore });
         } catch (e) {
           console.warn('setScore failed', e);
