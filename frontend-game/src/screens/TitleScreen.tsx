@@ -78,9 +78,6 @@ export const TitleScreen: React.FC = () => {
           <img src="/images/bear.gif" alt="Bear" style={{ width: 260 }} />
         </div>
         {/* Arcade UI Elements */}
-        <div className="absolute top-8 left-8 pixel-glow-purple text-sm">
-          INSERT COIN
-        </div>
       </div>
     </div>
   );
