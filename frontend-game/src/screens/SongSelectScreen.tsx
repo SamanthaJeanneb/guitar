@@ -67,33 +67,7 @@ export const SongSelectScreen: React.FC = () => {
               </div>
             </div>
             <div className="bg-gray-900/50 rounded-lg p-2 w-full max-w-xs mx-auto text-xs">
-              <div className="mb-2">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-300">POWER</span>
-                  <span className="text-white">{char.power}</span>
-                </div>
-                <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-red-500 to-red-600 transition-all duration-500" style={{ width: `${char.power}%` }} />
-                </div>
-              </div>
-              <div className="mb-2">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-300">SPEED</span>
-                  <span className="text-white">{char.speed}</span>
-                </div>
-                <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-500" style={{ width: `${char.speed}%` }} />
-                </div>
-              </div>
-              <div className="mb-2">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-300">STYLE</span>
-                  <span className="text-white">{char.style}</span>
-                </div>
-                <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-purple-500 to-purple-600 transition-all duration-500" style={{ width: `${char.style}%` }} />
-                </div>
-              </div>
+
             </div>
           </>
         )}
@@ -389,22 +363,28 @@ export const SongSelectScreen: React.FC = () => {
         
         {/* Main Content */}
         <div className="flex gap-8 mb-8 relative z-10 justify-center items-start">
+          {/* Back Button just to the left of character select */}
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-end', marginRight: '8px' }}>
+            <button
+              className="pixel-button"
+              onClick={() => setScreen('MODE_SELECT')}
+              style={{ marginBottom: '16px' }}
+            >
+              ← BACK
+            </button>
+          </div>
           {/* Character Selection - Left Side (swapper) */}
-          <div className="flex-shrink-0 w-80">
-            <div className={`pixel-panel p-6 ${focusMode === 'character' ? 'highlighted' : ''}`}> 
-              <h2 className="text-lg pixel-glow-purple mb-6">
-                Character {focusMode === 'character' && <span className="pixel-glow-pink">[ACTIVE]</span>}
-              </h2>
+          <div className="flex-shrink-0 w-80 flex flex-col h-full">
+            <div className={`pixel-panel p-6 h-full flex flex-col justify-center ${focusMode === 'character' ? 'highlighted' : ''}`}> 
               {/* Player 1 Character Swapper */}
               {renderChar(1)}
               {/* Player 2 Character Swapper (if multiplayer) */}
               {lobby.mode !== 'solo' && renderChar(2)}
             </div>
           </div>
-          
           {/* Song Selection - Center */}
-          <div className="flex-1 max-w-2xl">
-            <div className={`pixel-panel p-6 ${focusMode === 'song' ? 'highlighted' : ''}`}>
+          <div className="flex-1 max-w-2xl flex flex-col h-full">
+            <div className={`pixel-panel p-6 h-full flex flex-col justify-center ${focusMode === 'song' ? 'highlighted' : ''}`}> 
               <h2 className="text-lg pixel-glow-purple mb-6">
                 TRACKS {focusMode === 'song' && <span className="pixel-glow-pink">[ACTIVE]</span>}
               </h2>
@@ -651,14 +631,6 @@ export const SongSelectScreen: React.FC = () => {
         </div>
         
         {/* Back Button */}
-        <div className="absolute top-8 left-8">
-          <button
-            className="pixel-button"
-           onClick={() => setScreen('MODE_SELECT')}
-          >
-            ← BACK
-          </button>
-        </div>
       </div>
     </div>
   );
