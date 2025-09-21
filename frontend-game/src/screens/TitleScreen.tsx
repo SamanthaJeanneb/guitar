@@ -66,11 +66,11 @@ export const TitleScreen: React.FC = () => {
         </div>
         
         {/* Start Prompt */}
-          <div className="pixel-blink mb-12">
+          <div className="pixel mb-12">
             <p className="text-2xl pixel-glow-pink mb-8">
               PRESS ENTER TO START
             </p>
-            <button className="nes-btn is-primary text-lg px-8">
+            <button className="nes-btn is-error text-lg px-8" onClick={() => setScreen('MODE_SELECT')}>
               ENTER
             </button>
           </div>
