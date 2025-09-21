@@ -1,6 +1,7 @@
 import React from 'react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useGameStore, Song } from '../store/gameStore';
+import { useGeminiApi } from '../hooks/useGeminiApi';
 
 interface Character {
   id: string;
@@ -25,8 +26,10 @@ export const SongSelectScreen: React.FC = () => {
   const [showUpload, setShowUpload] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generateChart, setGenerateChart] = useState(false);
   const currentSongRef = useRef<string>('');
   const [lobbyJoinCode, setLobbyJoinCode] = useState('');
+  const geminiApi = useGeminiApi();
 
   const playPreview = useCallback((songItem: Song) => {
     // Stop current preview if playing
@@ -213,42 +216,91 @@ export const SongSelectScreen: React.FC = () => {
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && (file.type === 'audio/mp3' || file.type === 'audio/wav' || file.type === 'audio/mpeg')) {
+    if (file && (file.type === 'audio/mp3' || file.type === 'audio/wav' || file.type === 'audio/mpeg' || file.type === 'audio/mp4')) {
       setUploadFile(file);
     } else {
-      alert('Please upload an MP3 or WAV file');
+      alert('Please upload an MP3, WAV, or MP4 audio file');
     }
   };
 
-  const generateChart = async () => {
+  const handleUploadAndGenerate = async () => {
     if (!uploadFile) return;
     
     setIsGenerating(true);
     
-    // Simulate chart generation process
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // Create a new song entry
-    const newSong: Song = {
-      id: uploadFile.name.replace(/\.[^/.]+$/, ""), // Remove file extension
-      title: uploadFile.name.replace(/\.[^/.]+$/, "").toUpperCase(),
-      bpm: 120, // Default BPM
-      difficulty: 'Medium' as const
-    };
-    
-    // Add to songs list
-    setSongs(prev => [...prev, newSong]);
-    
-    // Select the new song
-    setSelectedSongIndex(songs.length);
-    selectSong(newSong);
-    
-    // Reset upload state
-    setUploadFile(null);
-    setShowUpload(false);
-    setIsGenerating(false);
-    
-    console.log('ChartGenerated', { songId: newSong.id, title: newSong.title });
+    try {
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('song', uploadFile);
+      
+      // Upload to backend
+      const response = await fetch('http://localhost:3001/api/upload-song', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // Optionally generate chart using Gemini if enabled
+        if (generateChart) {
+          try {
+            const songName = result.song.title;
+            const chartContent = await geminiApi.generateChart(songName);
+            
+            // Save chart to the song directory
+            const chartResponse = await fetch('http://localhost:3001/api/save-chart', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                songName: result.song.id,
+                chartData: chartContent
+              })
+            });
+            
+            if (chartResponse.ok) {
+              console.log('Chart generated and saved for:', songName);
+            }
+          } catch (chartError) {
+            console.warn('Chart generation failed:', chartError);
+            // Don't fail the upload if chart generation fails
+          }
+        }
+        
+        // Reload songs from the updated index.json
+        const songsResponse = await fetch('/songs/index.json', { cache: 'no-cache' });
+        if (songsResponse.ok) {
+          const updatedSongs: Song[] = await songsResponse.json();
+          setSongs(updatedSongs);
+          
+          // Find and select the new song
+          const newSongIndex = updatedSongs.findIndex(song => song.id === result.song.id);
+          if (newSongIndex >= 0) {
+            setSelectedSongIndex(newSongIndex);
+            selectSong(updatedSongs[newSongIndex]);
+          }
+        }
+        
+        console.log('Song uploaded successfully:', result.song);
+      } else {
+        throw new Error('Upload failed');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload song. Please try again.');
+    } finally {
+      // Reset upload state
+      setUploadFile(null);
+      setShowUpload(false);
+      setIsGenerating(false);
+      setGenerateChart(false);
+    }
   };
   
   return (
@@ -362,12 +414,12 @@ export const SongSelectScreen: React.FC = () => {
               {/* Upload Panel */}
               {showUpload && (
                 <div className="pixel-panel outlined p-4 mb-4">
-                  <h3 className="text-sm pixel-glow-pink mb-4 text-center">UPLOAD & GENERATE</h3>
+                  <h3 className="text-sm pixel-glow-pink mb-4 text-center">UPLOAD SONG</h3>
                   <div className="space-y-4">
                     <div>
                       <input
                         type="file"
-                        accept=".mp3,.wav"
+                        accept=".mp3,.wav,.mp4"
                         onChange={handleFileUpload}
                         className="hidden"
                         id="song-upload"
@@ -376,23 +428,47 @@ export const SongSelectScreen: React.FC = () => {
                         htmlFor="song-upload"
                         className="pixel-button w-full text-center cursor-pointer block py-3"
                       >
-                        {uploadFile ? uploadFile.name : 'SELECT MP3/WAV FILE'}
+                        {uploadFile ? uploadFile.name : 'SELECT MP3/WAV/MP4 FILE'}
                       </label>
                     </div>
                     
                     {uploadFile && (
-                      <div className="text-center">
-                        <button
-                          className={`pixel-button px-6 py-3 ${isGenerating ? 'selected' : ''}`}
-                          onClick={generateChart}
-                          disabled={isGenerating}
-                        >
-                          {isGenerating ? (
-                            <span className="pixel-blink">GENERATING CHART...</span>
-                          ) : (
-                            'GENERATE CHART'
-                          )}
-                        </button>
+                      <div className="space-y-4">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="generate-chart"
+                            checked={generateChart}
+                            onChange={(e) => setGenerateChart(e.target.checked)}
+                            disabled={isGenerating}
+                            className="w-4 h-4"
+                          />
+                          <label htmlFor="generate-chart" className="text-sm text-pixel-white">
+                            Generate chart using AI (requires Gemini API key)
+                          </label>
+                        </div>
+                        
+                        <div className="text-center">
+                          <button
+                            className={`pixel-button px-6 py-3 ${isGenerating ? 'selected' : ''}`}
+                            onClick={handleUploadAndGenerate}
+                            disabled={isGenerating || geminiApi.isLoading}
+                          >
+                            {isGenerating || geminiApi.isLoading ? (
+                              <span className="pixel-blink">
+                                {generateChart ? 'GENERATING CHART...' : 'UPLOADING SONG...'}
+                              </span>
+                            ) : (
+                              generateChart ? 'UPLOAD & GENERATE CHART' : 'UPLOAD SONG'
+                            )}
+                          </button>
+                        </div>
+                        
+                        {geminiApi.error && (
+                          <div className="text-red-400 text-xs text-center">
+                            Chart generation failed: {geminiApi.error}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
