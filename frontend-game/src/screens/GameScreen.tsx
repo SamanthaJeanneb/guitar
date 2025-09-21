@@ -75,7 +75,20 @@ export const GameScreen: React.FC = () => {
       [`comboP${player}`]: newCombo,
       [`accuracyP${player}`]: result.accuracy,
     });
-  }, [updateGameplay]);
+
+    const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
+    if (isMultiplayer && lobby.code) {
+      const conn = getConn();
+      const localPlayer = lobby.side === 'blue' ? 2 : 1; 
+      if (result.player === localPlayer && conn) {
+        try {
+          LobbyApi.setScore(conn, lobby.code, newScore);
+        } catch (e) {
+          console.warn('setScore failed', e);
+        }
+      }
+    }
+  }, [updateGameplay, lobby.mode, lobby.code, lobby.side, lobby.connectedP2]);
 
   const handleInput = useCallback((inputEvent: InputEvent) => {
     if (isPaused || !gameEngineRef.current) return;
@@ -253,6 +266,7 @@ export const GameScreen: React.FC = () => {
     gameplay.manProgress,
     gameplay.synchronizedGameOver,
     gameplay.synchronizedGameResult,
+  lobby.side,
   ]);
 
   // React to volume changes in settings
