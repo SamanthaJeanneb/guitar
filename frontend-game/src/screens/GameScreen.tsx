@@ -86,7 +86,14 @@ export const GameScreen: React.FC = () => {
         if (conn && lobby.code) {
           try {
             LobbyApi.setScore(conn, lobby.code, newScore);
-            console.log('[ScorePush]', { code: lobby.code, player, newScore });
+            console.log('[ScorePush]', { 
+              code: lobby.code, 
+              player, 
+              newScore, 
+              judgment: result.judgment.type,
+              lane: result.note?.lane,
+              side: lobby.side
+            });
           } catch (e) {
             console.warn('[ScorePushError]', { code: lobby.code, player, attempted: newScore, error: e });
           }
@@ -205,11 +212,24 @@ export const GameScreen: React.FC = () => {
         const redScore = gameplay.scoreP1; // This comes from lobby.redScore
         const blueScore = gameplay.scoreP2; // This comes from lobby.blueScore
         
+        console.log('Multiplayer Progress Debug', {
+          redScore,
+          blueScore,
+          redPlayer: lobby.side === 'red' ? 'local' : 'remote',
+          bluePlayer: lobby.side === 'blue' ? 'local' : 'remote'
+        });
+        
         // Convert scores to progress (0-100)
         // Use a reasonable max score for conversion (e.g., 10000 points = 100% progress)
         const maxScoreForProgress = 10000;
-        currentBearProgress = Math.min(100, (blueScore / maxScoreForProgress) * 100);
-        currentManProgress = Math.min(100, (redScore / maxScoreForProgress) * 100);
+        currentBearProgress = Math.min(100, (redScore / maxScoreForProgress) * 100);
+        currentManProgress = Math.min(100, (blueScore / maxScoreForProgress) * 100);
+        
+        console.log('Multiplayer Progress Calculated', {
+          bearProgress: currentBearProgress,
+          manProgress: currentManProgress,
+          maxScoreForProgress
+        });
       } else {
         // Single player uses engine stats
         currentBearProgress = stats.bearProgress;
