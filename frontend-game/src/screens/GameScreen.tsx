@@ -33,6 +33,10 @@ export const GameScreen: React.FC = () => {
   const scoreP2Ref = useRef(gameplay.scoreP2);
   const comboP1Ref = useRef(gameplay.comboP1);
   const comboP2Ref = useRef(gameplay.comboP2);
+  // Floating +score popups (mirrors gameclient implementation)
+  type ScorePopup = { id: number; amount: number };
+  const popupIdRef = useRef(0);
+  const [scorePopups, setScorePopups] = useState<{ 1: ScorePopup[]; 2: ScorePopup[] }>({ 1: [], 2: [] });
   // Track chase stats (bear vs man) pulled from engine
   const [bearProgress, setBearProgress] = useState(0);
   const [manProgress, setManProgress] = useState(0);
@@ -63,37 +67,42 @@ export const GameScreen: React.FC = () => {
   }, []);
 
   const handleNoteResult = useCallback((result: { judgment: Judgment; note: Note; player: number; accuracy: number }) => {
-    // Determine which side this browser controls (host -> red/P1, join -> blue/P2)
-    const localPlayer = lobby.side === 'blue' ? 2 : 1;
-    if (result.player !== localPlayer) {
-      // Ignore any engine callbacks that aren't for our local side; remote side comes from DB subscription
-      return;
-    }
-
-    const currentScore = localPlayer === 1 ? scoreP1Ref.current : scoreP2Ref.current;
-    const currentCombo = localPlayer === 1 ? comboP1Ref.current : comboP2Ref.current;
+    const player = result.player; // Engine callback tells us which player (we trigger only for local currently)
+    const currentScore = player === 1 ? scoreP1Ref.current : scoreP2Ref.current;
+    const currentCombo = player === 1 ? comboP1Ref.current : comboP2Ref.current;
     const newScore = currentScore + result.judgment.score;
     const newCombo = result.judgment.type !== 'Miss' ? currentCombo + 1 : 0;
 
+    // Immediate local optimistic update (mirrors gameclient behavior)
     updateGameplay({
-      [localPlayer === 1 ? 'scoreP1' : 'scoreP2']: newScore,
-      [localPlayer === 1 ? 'comboP1' : 'comboP2']: newCombo,
-      [localPlayer === 1 ? 'accuracyP1' : 'accuracyP2']: result.accuracy,
+      [player === 1 ? 'scoreP1' : 'scoreP2']: newScore,
+      [player === 1 ? 'comboP1' : 'comboP2']: newCombo,
+      [player === 1 ? 'accuracyP1' : 'accuracyP2']: result.accuracy,
     });
 
-    const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
-    if (isMultiplayer && lobby.code && result.judgment.type !== 'Miss') {
-      const conn = getConn();
-      if (conn) {
-        try {
-          LobbyApi.setScore(conn, lobby.code, newScore);
-          console.log('[ScoreSync] pushed', { code: lobby.code, localPlayer, newScore });
-        } catch (e) {
-          console.warn('setScore failed', e);
-        }
-      }
+    // Push to DB if this browser owns that player side
+    const conn = getConn();
+    const code = lobby.code;
+    const localPlayer = lobby.side === 'blue' ? 2 : 1;
+    if (conn && code && player === localPlayer && result.judgment.type !== 'Miss') {
+      try { LobbyApi.setScore(conn, code, newScore); } catch (e) { console.warn('setScore failed', e); }
     }
-  }, [updateGameplay, lobby.mode, lobby.code, lobby.side, lobby.connectedP2]);
+
+    // Floating +score popup
+    if (result.judgment.score > 0) {
+      const id = ++popupIdRef.current;
+      setScorePopups(prev => ({
+        ...prev,
+        [player]: [...prev[player as 1|2], { id, amount: result.judgment.score }]
+      }));
+      setTimeout(() => {
+        setScorePopups(prev => ({
+          ...prev,
+          [player]: prev[player as 1|2].filter(p => p.id !== id)
+        }));
+      }, 650);
+    }
+  }, [updateGameplay, lobby.code, lobby.side]);
 
   const handleInput = useCallback((inputEvent: InputEvent) => {
     if (isPaused || !gameEngineRef.current) return;
@@ -338,15 +347,21 @@ export const GameScreen: React.FC = () => {
       }
     };
     
+    const myPopups = scorePopups[player];
     return (
-      <div className="pixel-panel p-6 max-w-xs">
+      <div className="pixel-panel p-6 max-w-xs relative">
         <div className="text-center mb-4">
           <h3 className="pixel-glow-pink text-lg">P{player}</h3>
         </div>
         
         {/* Player Indicator */}
-        <div className={`w-24 h-32 mx-auto mb-4 ${colorClass} flex items-center justify-center`}>
+        <div className={`w-24 h-32 mx-auto mb-4 ${colorClass} flex items-center justify-center relative`}>
           <div className="text-6xl">{getCharacterIcon()}</div>
+          {myPopups.map(p => (
+            <div key={p.id} className="score-popup top-0 text-green-300 font-black text-xl">
+              +{p.amount}
+            </div>
+          ))}
         </div>
         
         {/* Stats */}
