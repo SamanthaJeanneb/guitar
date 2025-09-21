@@ -67,7 +67,8 @@ export const GameScreen: React.FC = () => {
   }, []);
 
   const handleNoteResult = useCallback((result: { judgment: Judgment; note: Note; player: number; accuracy: number }) => {
-    const player = lobby.side === 'blue' ? 2 : 1; // authoritative local side
+  if (!lobby.side) { return; } // side not chosen yet (shouldn't happen in GameScreen but guard)
+  const player = lobby.side === 'blue' ? 2 : 1; // authoritative local side
     const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
     const currentScore = player === 1 ? scoreP1Ref.current : scoreP2Ref.current;
     const currentCombo = player === 1 ? comboP1Ref.current : comboP2Ref.current;
@@ -117,8 +118,9 @@ export const GameScreen: React.FC = () => {
   }, [updateGameplay, lobby.code, lobby.side, lobby.mode, lobby.connectedP2]);
 
   const handleInput = useCallback((inputEvent: InputEvent) => {
-    if (isPaused || !gameEngineRef.current) return;
-    const localPlayer = lobby.side === 'blue' ? 2 : 1;
+  if (isPaused || !gameEngineRef.current) return;
+  if (!lobby.side) return; // ignore input until side is assigned by hosting/joining
+  const localPlayer = lobby.side === 'blue' ? 2 : 1;
     if (inputEvent.type === 'hit') {
       const result = gameEngineRef.current.handleInput(inputEvent.lane, inputEvent.type, localPlayer);
       if (result.judgment) {

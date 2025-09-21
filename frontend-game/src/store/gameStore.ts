@@ -16,7 +16,8 @@ export interface Player {
 }
 
 export interface Lobby {
-  mode: 'solo' | 'host' | 'join';
+  // mode 'multiplayer' = user is on multiplayer menu but hasn't hosted or joined yet
+  mode: 'solo' | 'multiplayer' | 'host' | 'join';
   code: string | null;
   connectedP2: boolean;
   p1Ready: boolean;
@@ -139,6 +140,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     const st = get();
     const conn = getConn();
     const localPlayer = st.lobby.side === 'blue' ? 2 : 1;
+    if (player === localPlayer) {
+      console.log('[IdentityConfirm]', { action: 'selectCharacter', side: st.lobby.side, player: localPlayer, characterId, message: `Confirmed local player is P${localPlayer} (${st.lobby.side})` });
+    }
     if (st.lobby.mode !== 'solo' && player === localPlayer && st.lobby.code && conn) {
       try { LobbyApi.setCharacter(conn, st.lobby.code, characterId); } catch (e) { console.warn('setCharacter failed', e); }
     }
@@ -146,15 +150,16 @@ export const useGameStore = create<GameState>((set, get) => ({
   
   setMode: (mode) => {
     if (mode === 'multiplayer') {
-      // Flip to multiplayer host state, no code yet until hostLobby
-      set((state) => ({ lobby: { ...state.lobby, mode: 'host', code: null, connectedP2: false, p1Ready: false, p2Ready: false, redPresent: false, bluePresent: false } }));
+      // Enter neutral multiplayer menu state. Do NOT assign side until hostLobby/joinLobby.
+      set((state) => ({ lobby: { ...state.lobby, mode: 'multiplayer', code: null, connectedP2: false, p1Ready: false, p2Ready: false, redPresent: false, bluePresent: false, side: undefined } }));
+      // Pre-connect networking to reduce latency when hosting/joining, but no identity yet.
       if (!getConn()) {
         const saved = localStorage.getItem('auth_token') || undefined;
         void connectSpacetime(saved).then(({ connected, error }) => set({ netConnected: connected, netError: error ?? null }));
       } else {
         set({ netConnected: true, netError: null });
       }
-    } else {
+    } else { // solo
       set((state) => ({
         lobby: { ...state.lobby, mode: 'solo', code: null, connectedP2: false, p1Ready: false, p2Ready: false, redPresent: false, bluePresent: false, side: undefined },
       }));
@@ -175,8 +180,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       const saved = localStorage.getItem('auth_token') || undefined;
       void connectSpacetime(saved).then((st) => { set({ netConnected: st.connected, netError: st.error }); if (st.conn && st.connected) { doCreate(st.conn); const s = get().song; if (s) { try { LobbyApi.setSong(st.conn, code, s.id); } catch (e) { console.warn('setSong (host connect) failed', e); } } } });
     }
-    set((state) => ({ lobby: { ...state.lobby, mode: 'host', code, p1Ready: false, p2Ready: false, side: 'red' } }));
-    const unsub = subscribeLobby(code, (row) => {
+  set((state) => ({ lobby: { ...state.lobby, mode: 'host', code, p1Ready: false, p2Ready: false, side: 'red' } }));
+  console.log('[Identity]', { action: 'hostLobby', side: 'red', player: 1, message: 'You are Player 1 (red)' });
+    const unsub = subscribeLobby(code, (rowRaw) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const row: any = rowRaw;
       set((state) => ({
         lobby: { ...state.lobby, connectedP2: !!row?.red && !!row?.blue, redPresent: !!row?.red, bluePresent: !!row?.blue, side: state.lobby.side, p1Ready: row?.red_ready ?? state.lobby.p1Ready, p2Ready: row?.blue_ready ?? state.lobby.p2Ready },
       }));
@@ -216,7 +224,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       void connectSpacetime(saved).then((st) => { set({ netConnected: st.connected, netError: st.error }); if (st.conn && st.connected) doJoin(st.conn); });
     }
     set((state) => ({ lobby: { ...state.lobby, mode: 'join', code, connectedP2: false, p1Ready: false, p2Ready: false, side: 'blue' } }));
-    const unsub = subscribeLobby(code, (row) => {
+    console.log('[Identity]', { action: 'joinLobby', side: 'blue', player: 2, message: 'You are Player 2 (blue)' });
+    const unsub = subscribeLobby(code, (rowRaw) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const row: any = rowRaw;
       set((state) => ({ lobby: { ...state.lobby, connectedP2: !!row?.red && !!row?.blue, redPresent: !!row?.red, bluePresent: !!row?.blue, side: state.lobby.side, p1Ready: row?.red_ready ?? state.lobby.p1Ready, p2Ready: row?.blue_ready ?? state.lobby.p2Ready } }));
       if (row?.started && get().currentScreen !== 'GAME') { set({ currentScreen: 'GAME' }); }
       if (row) {
