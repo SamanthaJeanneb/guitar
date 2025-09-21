@@ -20,8 +20,86 @@ export const SongSelectScreen: React.FC = () => {
   const { song, players, lobby, selectSong, selectCharacter, toggleReady, startMatch, setScreen, hostLobby, joinLobby, netConnected, netError } = useGameStore();
   const [songs, setSongs] = useState<Song[]>([]);
   const [selectedSongIndex, setSelectedSongIndex] = useState(0);
-  const [selectedCharIndex, setSelectedCharIndex] = useState(0);
   const [focusMode, setFocusMode] = useState<'song' | 'character'>('song');
+  // Character swapper logic
+  const CHARACTERS_FULL = React.useMemo(() => [
+    { id: 'bear', name: 'BEAR', power: 85, speed: 70, style: 60, color: 'from-red-500 to-orange-500' },
+    { id: 'man', name: 'MAN', power: 60, speed: 85, style: 80, color: 'from-blue-500 to-cyan-500' },
+  ], []);
+  const getCharIndex = React.useCallback((player: 1 | 2) => {
+    const id = player === 1 ? players.p1.characterId : players.p2.characterId;
+    return CHARACTERS_FULL.findIndex(c => c.id === id) >= 0 ? CHARACTERS_FULL.findIndex(c => c.id === id) : 0;
+  }, [players.p1.characterId, players.p2.characterId, CHARACTERS_FULL]);
+  const swapChar = React.useCallback((player: 1 | 2, dir: -1 | 1) => {
+    const idx = getCharIndex(player);
+    const newIdx = (idx + CHARACTERS_FULL.length + dir) % CHARACTERS_FULL.length;
+    selectCharacter(player, CHARACTERS_FULL[newIdx].id);
+  }, [getCharIndex, selectCharacter, CHARACTERS_FULL]);
+  const renderChar = (player: 1 | 2) => {
+    const idx = getCharIndex(player);
+    const char = CHARACTERS_FULL[idx];
+    const isP2Available = lobby.connectedP2 || player === 1;
+    const imgSrc = char.id === 'bear' ? '/images/bearcharacter.png' : '/images/mancharacter.png';
+    return (
+      <div className="flex flex-col items-center py-8">
+        {!isP2Available && <p className="text-gray-500 text-sm mb-4">Waiting for opponent...</p>}
+        {isP2Available && (
+          <>
+            <div className="flex items-center justify-center gap-4 mb-4">
+              <button
+                className="nes-btn is-warning text-base px-2 py-1"
+                style={{ minWidth: 32, minHeight: 32 }}
+                onClick={() => swapChar(player, -1)}
+                aria-label="Previous Character"
+              >←</button>
+              <img src={imgSrc} alt={char.name} style={{ width: 220, height: 260 }} />
+              <button
+                className="nes-btn is-warning text-base px-2 py-1"
+                style={{ minWidth: 32, minHeight: 32 }}
+                onClick={() => swapChar(player, 1)}
+                aria-label="Next Character"
+              >→</button>
+            </div>
+            <div className="text-center mb-2">
+              <h3 className="text-2xl font-bold text-white mb-1">{char.name}</h3>
+              <div className="text-lg text-pixel-gray mb-1">
+                {char.id === 'bear' ? 'GUITAR' : 'DRUMS'}
+              </div>
+            </div>
+            <div className="bg-gray-900/50 rounded-lg p-2 w-full max-w-xs mx-auto text-xs">
+              <div className="mb-2">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-300">POWER</span>
+                  <span className="text-white">{char.power}</span>
+                </div>
+                <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-red-500 to-red-600 transition-all duration-500" style={{ width: `${char.power}%` }} />
+                </div>
+              </div>
+              <div className="mb-2">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-300">SPEED</span>
+                  <span className="text-white">{char.speed}</span>
+                </div>
+                <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-500" style={{ width: `${char.speed}%` }} />
+                </div>
+              </div>
+              <div className="mb-2">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-300">STYLE</span>
+                  <span className="text-white">{char.style}</span>
+                </div>
+                <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-purple-500 to-purple-600 transition-all duration-500" style={{ width: `${char.style}%` }} />
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
   const [previewAudio, setPreviewAudio] = useState<HTMLAudioElement | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -149,9 +227,7 @@ export const SongSelectScreen: React.FC = () => {
             selectSong(songs[newIndex]);
             playPreview(songs[newIndex]);
           } else {
-            const newIndex = (selectedCharIndex - 1 + CHARACTERS.length) % CHARACTERS.length;
-            setSelectedCharIndex(newIndex);
-            selectCharacter(1, CHARACTERS[newIndex].id);
+            swapChar(1, -1);
           }
           break;
         }
@@ -163,9 +239,7 @@ export const SongSelectScreen: React.FC = () => {
             selectSong(songs[newIndex]);
             playPreview(songs[newIndex]);
           } else {
-            const newIndex = (selectedCharIndex + 1) % CHARACTERS.length;
-            setSelectedCharIndex(newIndex);
-            selectCharacter(1, CHARACTERS[newIndex].id);
+            swapChar(1, 1);
           }
           break;
         }
@@ -204,7 +278,7 @@ export const SongSelectScreen: React.FC = () => {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedSongIndex, selectedCharIndex, focusMode, selectSong, selectCharacter, startMatch, setScreen, songs, lobby.mode, toggleReady, canStart, playPreview]);
+  }, [selectedSongIndex, focusMode, selectSong, selectCharacter, startMatch, setScreen, songs, lobby.mode, toggleReady, canStart, playPreview, swapChar]);
 
   const getDifficultyColor = (difficulty: Song['difficulty']) => {
     switch (difficulty) {
@@ -315,83 +389,16 @@ export const SongSelectScreen: React.FC = () => {
         
         {/* Main Content */}
         <div className="flex gap-8 mb-8 relative z-10 justify-center items-start">
-          {/* Character Selection - Left Side */}
+          {/* Character Selection - Left Side (swapper) */}
           <div className="flex-shrink-0 w-80">
-            <div className={`pixel-panel p-6 ${focusMode === 'character' ? 'highlighted' : ''}`}>
+            <div className={`pixel-panel p-6 ${focusMode === 'character' ? 'highlighted' : ''}`}> 
               <h2 className="text-lg pixel-glow-purple mb-6">
                 Character {focusMode === 'character' && <span className="pixel-glow-pink">[ACTIVE]</span>}
               </h2>
-              
-              {/* Player 1 Character */}
-              <div className="mb-6">
-                <h3 className="text-sm pixel-glow-pink mb-4">PLAYER 1</h3>
-                <div className="space-y-3">
-                  {CHARACTERS.map((char, index) => (
-                    <div
-                      key={char.id}
-                      className={`p-3 pixel-panel transition-all cursor-pointer ${
-                        selectedCharIndex === index && focusMode === 'character'
-                          ? 'highlighted scale-105'
-                          : players.p1.characterId === char.id
-                          ? 'outlined'
-                          : 'hover:border-pixel-purple'
-                      }`}
-                      onClick={() => {
-                        setSelectedCharIndex(index);
-                        selectCharacter(1, char.id);
-                      }}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-12 h-12 ${char.color === 'from-red-500 to-orange-500' ? 'lane-red' : 'lane-blue'} flex items-center justify-center`}>
-                          <span className="text-xl">👤</span>
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-pixel-white text-xs">{char.name}</div>
-                          <div className="text-xs text-pixel-gray">FIGHT ON!</div>
-                        </div>
-                      </div>
-                      
-                      {/* Selection indicator */}
-                      {selectedCharIndex === index && focusMode === 'character' && (
-                        <div className="flex items-center justify-center mt-2">
-                          <div className="pixel-arrow left mr-2 pixel-blink"></div>
-                          <span className="pixel-glow-pink text-xs">SELECT</span>
-                          <div className="pixel-arrow right ml-2 pixel-blink"></div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Player 2 Character (if multiplayer) */}
-              {lobby.mode !== 'solo' && (
-                <div>
-                  <h3 className="text-sm pixel-glow-purple mb-4">PLAYER 2</h3>
-                  <div className="p-3 pixel-panel outlined">
-                    {lobby.connectedP2 && players.p2.characterId ? (
-                      <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 lane-blue flex items-center justify-center">
-                          <span className="text-xl">👤</span>
-                        </div>
-                        <div>
-                          <div className="text-pixel-white text-xs">
-                            {CHARACTERS.find(c => c.id === players.p2.characterId)?.name || 'UNKNOWN'}
-                          </div>
-                          <div className={`text-xs ${lobby.p2Ready ? 'text-green-400' : 'text-yellow-400'}`}>
-                            {lobby.p2Ready ? 'READY' : 'NOT READY'}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center text-pixel-gray">
-                        <div className="text-xs">{lobby.code ? 'WAITING FOR PLAYER 2' : 'CREATE OR JOIN LOBBY'}</div>
-                        {!lobby.connectedP2 && lobby.code && <div className="pixel-blink text-xs mt-1">…</div>}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+              {/* Player 1 Character Swapper */}
+              {renderChar(1)}
+              {/* Player 2 Character Swapper (if multiplayer) */}
+              {lobby.mode !== 'solo' && renderChar(2)}
             </div>
           </div>
           

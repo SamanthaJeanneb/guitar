@@ -92,7 +92,33 @@ function AppWithTest() {
     }
   };
 
-  return <div onClick={handleUserInteraction}>{renderScreen()}</div>;
+  return (
+    <div onClick={handleUserInteraction} style={{ position: 'relative', minHeight: '100vh' }}>
+      {/* Screen-specific border overlay */}
+      <img
+        src={
+          currentScreen === 'SONG_SELECT'
+            ? '/images/bordersongselect.png'
+            : currentScreen === 'GAME'
+            ? '/images/bordergame.png'
+            : currentScreen === 'MODE_SELECT'
+            ? '/images/bordermodeselect.png'
+            : '/images/outline.png'
+        }
+        alt="Screen Border"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          pointerEvents: 'none',
+          zIndex: 100,
+        }}
+      />
+      {renderScreen()}
+    </div>
+  );
 }
 
 export default AppWithTest;
