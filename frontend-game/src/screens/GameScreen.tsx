@@ -67,9 +67,8 @@ export const GameScreen: React.FC = () => {
   }, []);
 
   const handleNoteResult = useCallback((result: { judgment: Judgment; note: Note; player: number; accuracy: number }) => {
-  // In single player mode, lobby.side is undefined, so use the player from the result
-  // In multiplayer mode, lobby.side determines the authoritative local side
-  const player = lobby.side ? (lobby.side === 'blue' ? 2 : 1) : result.player;
+  if (!lobby.side) { return; } // side not chosen yet (shouldn't happen in GameScreen but guard)
+  const player = lobby.side === 'blue' ? 2 : 1; // authoritative local side
     const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
     const currentScore = player === 1 ? scoreP1Ref.current : scoreP2Ref.current;
     const currentCombo = player === 1 ? comboP1Ref.current : comboP2Ref.current;
@@ -92,11 +91,6 @@ export const GameScreen: React.FC = () => {
             console.warn('[ScorePushError]', { code: lobby.code, player, attempted: newScore, error: e });
           }
         }
-      }
-      
-      // Update the multiplayer engine with the new score for chase mechanics
-      if (gameEngineRef.current && 'updatePlayerScore' in gameEngineRef.current) {
-        (gameEngineRef.current as any).updatePlayerScore(player, newScore);
       }
     } else {
       // Solo mode: update everything locally.
@@ -126,9 +120,11 @@ export const GameScreen: React.FC = () => {
   const handleInput = useCallback((inputEvent: InputEvent) => {
   if (isPaused || !gameEngineRef.current) return;
   
-  // In single player mode, lobby.side is undefined, so default to player 1
+  // In single player mode, lobby.side is undefined, so use player 1
   // In multiplayer mode, lobby.side determines the player
-  const localPlayer = lobby.side ? (lobby.side === 'blue' ? 2 : 1) : 1;
+  const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
+  if (isMultiplayer && !lobby.side) return; // ignore input until side is assigned by hosting/joining
+  const localPlayer = isMultiplayer ? (lobby.side === 'blue' ? 2 : 1) : 1;
     if (inputEvent.type === 'hit') {
       const result = gameEngineRef.current.handleInput(inputEvent.lane, inputEvent.type, localPlayer);
       if (result.judgment) {
@@ -188,12 +184,6 @@ export const GameScreen: React.FC = () => {
     // Set up note result callback
     gameEngineRef.current.setNoteResultCallback(handleNoteResult);
     
-    // Set character assignments for multiplayer engine
-    if (isMultiplayer && 'setPlayerCharacter' in gameEngineRef.current) {
-      (gameEngineRef.current as any).setPlayerCharacter(1, players.p1.characterId || 'bear');
-      (gameEngineRef.current as any).setPlayerCharacter(2, players.p2.characterId || 'man');
-    }
-    
   // Setup input handling
   const cleanup = inputHandlerRef.current.onInput(handleInput);
     
@@ -209,12 +199,6 @@ export const GameScreen: React.FC = () => {
       const currentManProgress = isMultiplayer ? gameplay.manProgress : stats.manProgress;
       const currentGameOver = isMultiplayer ? gameplay.synchronizedGameOver : stats.gameOver;
       const currentGameResult = isMultiplayer ? gameplay.synchronizedGameResult : stats.gameResult;
-      
-      // Update multiplayer engine with synchronized scores for chase mechanics
-      if (isMultiplayer && gameEngineRef.current && 'updatePlayerScore' in gameEngineRef.current) {
-        (gameEngineRef.current as any).updatePlayerScore(1, gameplay.scoreP1);
-        (gameEngineRef.current as any).updatePlayerScore(2, gameplay.scoreP2);
-      }
       
       setBearProgress(currentBearProgress);
       setManProgress(currentManProgress);
@@ -344,7 +328,7 @@ export const GameScreen: React.FC = () => {
       gameOver: false,
     });
     
-    // Restart the game engine - use the same mode detection logic as the main useEffect
+    // Restart the game engine with correct type based on mode
     if (gameEngineRef.current && song) {
       const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
       gameEngineRef.current = isMultiplayer 

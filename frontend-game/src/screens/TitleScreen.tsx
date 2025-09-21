@@ -57,7 +57,7 @@ export const TitleScreen: React.FC = () => {
       <div className="game-container text-center">
         {/* Main Title */}
         <div className="mb-16">
-          <h1 className="retro-title text-6xl mb-8 pixel-glow-pink">
+          <h1 className="retro-title text-7xl mb-8" style={{ color: '#960018'}}>
             SAVE THE BEAR
           </h1>
           <div className="pixel-glow-purple text-xl mb-4">
@@ -66,8 +66,8 @@ export const TitleScreen: React.FC = () => {
         </div>
         
         {/* Start Prompt */}
-          <div className="pixel mb-12">
-            <p className="text-2xl pixel-glow-pink mb-8">
+          <div className="pixel mb-8">
+            <p className="text-2xl pixel-glow-pink mb-8" style={{ color: '#960018'}}>
               PRESS ENTER TO START
             </p>
             <button className="nes-btn is-error text-lg px-8" onClick={() => setScreen('MODE_SELECT')}>
@@ -79,10 +79,10 @@ export const TitleScreen: React.FC = () => {
         <div className="absolute top-8 left-8 pixel-glow-purple text-sm">
           INSERT COIN
         </div>
-        <div className="absolute top-8 right-8 pixel-glow-pink text-sm">
+        <div className="absolute top-8 right-8 pixel-glow-pink text-sm"  style={{ color: '#960018'}}>
           HIGH SCORE 999999
         </div>
-        <div className="absolute bottom-8 left-8 pixel-glow-pink text-sm">
+        <div className="absolute bottom-8 left-8 pixel-glow-pink text-sm"  style={{ color: '#960018'}}>
           1 PLAYER
         </div>
         <div className="absolute bottom-8 right-8 pixel-glow-purple text-sm">
