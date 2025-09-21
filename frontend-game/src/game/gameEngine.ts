@@ -208,7 +208,7 @@ export class GameEngine {
   }
   
   private playMusic(songId: string) {
-    this.audioElement = new Audio(`/songs/${songId}/song.ogg`);
+    this.audioElement = new Audio(`/songs/${songId}/song.mp3`);
     this.audioElement.volume = 1; // use gainNode for master volume control
     
     // Connect to Web Audio API
