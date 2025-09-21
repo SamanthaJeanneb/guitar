@@ -77,12 +77,14 @@ export const GameScreen: React.FC = () => {
     });
 
     const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
-    if (isMultiplayer && lobby.code) {
+    if (isMultiplayer && lobby.code && result.judgment.type !== 'Miss') {
       const conn = getConn();
-      const localPlayer = lobby.side === 'blue' ? 2 : 1; 
+      const localPlayer = lobby.side === 'blue' ? 2 : 1; // Determine which score we are allowed to push
       if (result.player === localPlayer && conn) {
         try {
           LobbyApi.setScore(conn, lobby.code, newScore);
+          // Debug trace: remove later
+          console.log('[ScoreSync] pushed', { code: lobby.code, localPlayer, newScore });
         } catch (e) {
           console.warn('setScore failed', e);
         }
@@ -411,35 +413,29 @@ export const GameScreen: React.FC = () => {
         </div>
       </div>
       
-      {/* HUD */}
-      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 game-container">
-        <div className="flex items-center space-x-6 pixel-score">
-          <div className="text-center">
-            <div className="pixel-glow-purple text-xs">SCORE</div>
-            <div className="pixel-glow-pink text-sm">
-              {(gameplay.scoreP1 + gameplay.scoreP2).toLocaleString()}
-            </div>
+      {/* HUD: Show P1 and P2 scores simultaneously (left/right) with shared combo & aggregate grade */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 game-container">
+        <div className="flex items-stretch gap-4 pixel-score bg-pixel-darker/70 px-6 py-3 rounded-md border border-pixel-purple/40">
+          {/* P1 */}
+          <div className="text-center min-w-[90px]">
+            <div className="pixel-glow-green text-[10px] tracking-wider">P1 SCORE</div>
+            <div className="pixel-glow-pink text-sm tabular-nums">{gameplay.scoreP1.toLocaleString()}</div>
+            <div className="text-[9px] text-pixel-gray mt-0.5">ACC {gameplay.accuracyP1.toFixed(1)}%</div>
           </div>
-          <div className="w-1 h-6 bg-pixel-gray"></div>
-          <div className="text-center">
-            <div className="pixel-glow-purple text-xs">COMBO</div>
-            <div className="pixel-glow-pink text-sm">
-              {Math.max(gameplay.comboP1, gameplay.comboP2)}x
-            </div>
+          <div className="w-px bg-pixel-gray/40" />
+          {/* Center Shared Info */}
+          <div className="text-center px-2">
+            <div className="pixel-glow-purple text-[10px]">MAX COMBO</div>
+            <div className="pixel-glow-pink text-sm tabular-nums">{Math.max(gameplay.comboP1, gameplay.comboP2)}x</div>
+            <div className="pixel-glow-purple text-[10px] mt-1">GRADE</div>
+            <div className="pixel-glow-pink text-sm">{getRank((gameplay.accuracyP1 + gameplay.accuracyP2) / 2)}</div>
           </div>
-          <div className="w-1 h-6 bg-pixel-gray"></div>
-          <div className="text-center">
-            <div className="pixel-glow-purple text-xs">ACCURACY</div>
-            <div className="pixel-glow-pink text-sm">
-              {((gameplay.accuracyP1 + gameplay.accuracyP2) / 2).toFixed(1)}%
-            </div>
-          </div>
-          <div className="w-1 h-6 bg-pixel-gray"></div>
-          <div className="text-center">
-            <div className="pixel-glow-purple text-xs">GRADE</div>
-            <div className="pixel-glow-pink text-sm">
-              {getRank((gameplay.accuracyP1 + gameplay.accuracyP2) / 2)}
-            </div>
+          <div className="w-px bg-pixel-gray/40" />
+          {/* P2 */}
+            <div className="text-center min-w-[90px]">
+            <div className="pixel-glow-blue text-[10px] tracking-wider">P2 SCORE</div>
+            <div className="pixel-glow-pink text-sm tabular-nums">{gameplay.scoreP2.toLocaleString()}</div>
+            <div className="text-[9px] text-pixel-gray mt-0.5">ACC {gameplay.accuracyP2.toFixed(1)}%</div>
           </div>
         </div>
       </div>
