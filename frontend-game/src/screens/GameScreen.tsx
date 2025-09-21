@@ -70,6 +70,15 @@ export const GameScreen: React.FC = () => {
   // In single player mode, lobby.side is undefined, so use the player from the result
   // In multiplayer mode, lobby.side determines the authoritative local side
   const player = lobby.side ? (lobby.side === 'blue' ? 2 : 1) : result.player;
+  
+  console.log('[GameScreen] handleNoteResult called', { 
+    resultPlayer: result.player, 
+    lobbySide: lobby.side, 
+    finalPlayer: player,
+    judgment: result.judgment.type,
+    score: result.judgment.score,
+    isMultiplayer: lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2
+  });
     const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
     const currentScore = player === 1 ? scoreP1Ref.current : scoreP2Ref.current;
     const currentCombo = player === 1 ? comboP1Ref.current : comboP2Ref.current;
@@ -97,7 +106,12 @@ export const GameScreen: React.FC = () => {
       // Update the multiplayer engine with the new score for chase mechanics
       if (gameEngineRef.current && 'updatePlayerScore' in gameEngineRef.current) {
         (gameEngineRef.current as any).updatePlayerScore(player, newScore);
-        console.log('[GameScreen] Updated multiplayer engine score', { player, newScore });
+        console.log('[GameScreen] Updated multiplayer engine score', { 
+          player, 
+          newScore, 
+          previousScore: player === 1 ? scoreP1Ref.current : scoreP2Ref.current,
+          judgment: result.judgment.type
+        });
       }
     } else {
       // Solo mode: update everything locally.
@@ -129,7 +143,15 @@ export const GameScreen: React.FC = () => {
   
   // In single player mode, lobby.side is undefined, so default to player 1
   // In multiplayer mode, lobby.side determines the player
+  // The input handler always sends player 1 events, so we need to map them to the correct local player
   const localPlayer = lobby.side ? (lobby.side === 'blue' ? 2 : 1) : 1;
+  
+  console.log('[GameScreen] handleInput called', { 
+    inputEventPlayer: inputEvent.player, 
+    lobbySide: lobby.side, 
+    localPlayer,
+    isMultiplayer: lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2
+  });
     if (inputEvent.type === 'hit') {
       const result = gameEngineRef.current.handleInput(inputEvent.lane, inputEvent.type, localPlayer);
       if (result.judgment) {
