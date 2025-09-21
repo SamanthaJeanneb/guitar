@@ -45,6 +45,9 @@ export const GameScreen: React.FC = () => {
   const [playerWon, setPlayerWon] = useState<boolean | null>(null);
   const statsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const endHandledRef = useRef(false);
+  
+  // Determine if we're in multiplayer mode
+  const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
 
   useEffect(() => { scoreP1Ref.current = gameplay.scoreP1; }, [gameplay.scoreP1]);
   useEffect(() => { scoreP2Ref.current = gameplay.scoreP2; }, [gameplay.scoreP2]);
@@ -67,9 +70,8 @@ export const GameScreen: React.FC = () => {
   }, []);
 
   const handleNoteResult = useCallback((result: { judgment: Judgment; note: Note; player: number; accuracy: number }) => {
-  // In single player mode, lobby.side is undefined, so use the player from the result
-  // In multiplayer mode, lobby.side determines the authoritative local side
-  const player = lobby.side ? (lobby.side === 'blue' ? 2 : 1) : result.player;
+  if (!lobby.side) { return; } // side not chosen yet (shouldn't happen in GameScreen but guard)
+  const player = lobby.side === 'blue' ? 2 : 1; // authoritative local side
     const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
     const currentScore = player === 1 ? scoreP1Ref.current : scoreP2Ref.current;
     const currentCombo = player === 1 ? comboP1Ref.current : comboP2Ref.current;
@@ -92,17 +94,6 @@ export const GameScreen: React.FC = () => {
             console.warn('[ScorePushError]', { code: lobby.code, player, attempted: newScore, error: e });
           }
         }
-      }
-      
-      // Update the multiplayer engine with the new score for chase mechanics
-      if (gameEngineRef.current && 'updatePlayerScore' in gameEngineRef.current) {
-        (gameEngineRef.current as any).updatePlayerScore(player, newScore);
-        console.log('Updated multiplayer engine score', { 
-          player, 
-          newScore, 
-          previousScore: player === 1 ? scoreP1Ref.current : scoreP2Ref.current,
-          judgment: result.judgment.type
-        });
       }
     } else {
       // Solo mode: update everything locally.
@@ -132,9 +123,11 @@ export const GameScreen: React.FC = () => {
   const handleInput = useCallback((inputEvent: InputEvent) => {
   if (isPaused || !gameEngineRef.current) return;
   
-  // In single player mode, lobby.side is undefined, so default to player 1
+  // In single player mode, lobby.side is undefined, so use player 1
   // In multiplayer mode, lobby.side determines the player
-  const localPlayer = lobby.side ? (lobby.side === 'blue' ? 2 : 1) : 1;
+  const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
+  if (isMultiplayer && !lobby.side) return; // ignore input until side is assigned by hosting/joining
+  const localPlayer = isMultiplayer ? (lobby.side === 'blue' ? 2 : 1) : 1;
     if (inputEvent.type === 'hit') {
       const result = gameEngineRef.current.handleInput(inputEvent.lane, inputEvent.type, localPlayer);
       if (result.judgment) {
@@ -194,16 +187,6 @@ export const GameScreen: React.FC = () => {
     // Set up note result callback
     gameEngineRef.current.setNoteResultCallback(handleNoteResult);
     
-    // Set character assignments for multiplayer engine
-    if (isMultiplayer && 'setPlayerCharacter' in gameEngineRef.current) {
-      (gameEngineRef.current as any).setPlayerCharacter(1, players.p1.characterId || 'bear');
-      (gameEngineRef.current as any).setPlayerCharacter(2, players.p2.characterId || 'man');
-      console.log('Character assignments set', { 
-        p1Character: players.p1.characterId || 'bear', 
-        p2Character: players.p2.characterId || 'man' 
-      });
-    }
-    
   // Setup input handling
   const cleanup = inputHandlerRef.current.onInput(handleInput);
     
@@ -214,21 +197,29 @@ export const GameScreen: React.FC = () => {
       const stats = engine.getStats();
       
       // Use synchronized values in multiplayer, local values in single player
-      const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
-      const currentBearProgress = isMultiplayer ? gameplay.bearProgress : stats.bearProgress;
-      const currentManProgress = isMultiplayer ? gameplay.manProgress : stats.manProgress;
+      
+      let currentBearProgress: number;
+      let currentManProgress: number;
+      
+      if (isMultiplayer) {
+        // In multiplayer, use scores to determine bear vs man progress
+        // Bear player (red) vs Man player (blue)
+        const redScore = gameplay.scoreP1; // This comes from lobby.redScore
+        const blueScore = gameplay.scoreP2; // This comes from lobby.blueScore
+        
+        // Convert scores to progress (0-100)
+        // Use a reasonable max score for conversion (e.g., 10000 points = 100% progress)
+        const maxScoreForProgress = 10000;
+        currentBearProgress = Math.min(100, (redScore / maxScoreForProgress) * 100);
+        currentManProgress = Math.min(100, (blueScore / maxScoreForProgress) * 100);
+      } else {
+        // Single player uses engine stats
+        currentBearProgress = stats.bearProgress;
+        currentManProgress = stats.manProgress;
+      }
+      
       const currentGameOver = isMultiplayer ? gameplay.synchronizedGameOver : stats.gameOver;
       const currentGameResult = isMultiplayer ? gameplay.synchronizedGameResult : stats.gameResult;
-      
-      // Update multiplayer engine with synchronized scores for chase mechanics
-      if (isMultiplayer && gameEngineRef.current && 'updatePlayerScore' in gameEngineRef.current) {
-        (gameEngineRef.current as any).updatePlayerScore(1, gameplay.scoreP1);
-        (gameEngineRef.current as any).updatePlayerScore(2, gameplay.scoreP2);
-        console.log('Updated multiplayer engine with synchronized scores', { 
-          p1Score: gameplay.scoreP1, 
-          p2Score: gameplay.scoreP2 
-        });
-      }
       
       setBearProgress(currentBearProgress);
       setManProgress(currentManProgress);
@@ -247,23 +238,19 @@ export const GameScreen: React.FC = () => {
           let currentPlayerWon = false;
           
           if (isMultiplayer) {
-            // In multiplayer, determine win condition based on character assignment
+            // In multiplayer, determine win condition based on scores
             const localPlayer = lobby.side === 'blue' ? 2 : 1;
-            const localPlayerCharacter = localPlayer === 1 ? players.p1.characterId : players.p2.characterId;
+            const localPlayerScore = localPlayer === 1 ? gameplay.scoreP1 : gameplay.scoreP2;
+            const opponentScore = localPlayer === 1 ? gameplay.scoreP2 : gameplay.scoreP1;
             
-            if (currentGameResult === 'bear_escaped') {
-              // Bear escaped - bear player wins
-              currentPlayerWon = localPlayerCharacter === 'bear';
-            } else if (currentGameResult === 'man_caught') {
-              // Man caught the bear - man player wins
-              currentPlayerWon = localPlayerCharacter === 'man';
-            }
+            // Winner is determined by higher score
+            currentPlayerWon = localPlayerScore > opponentScore;
             
             setPlayerWon(currentPlayerWon);
             console.log('Multiplayer game result:', {
-              gameResult: currentGameResult,
               localPlayer,
-              localPlayerCharacter,
+              localPlayerScore,
+              opponentScore,
               playerWon: currentPlayerWon
             });
           } else {
@@ -358,24 +345,13 @@ export const GameScreen: React.FC = () => {
       gameOver: false,
     });
     
-    // Restart the game engine - use the same mode detection logic as the main useEffect
+    // Restart the game engine with correct type based on mode
     if (gameEngineRef.current && song) {
       const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
       gameEngineRef.current = isMultiplayer 
         ? new MultiplayerGameEngine(canvasRef.current!, window.gameAudioContext!, window.gameGainNode!)
         : new GameEngine(canvasRef.current!, window.gameAudioContext!, window.gameGainNode!);
       gameEngineRef.current.setNoteResultCallback(handleNoteResult);
-      
-      // Set character assignments for multiplayer engine
-      if (isMultiplayer && 'setPlayerCharacter' in gameEngineRef.current) {
-        (gameEngineRef.current as any).setPlayerCharacter(1, players.p1.characterId || 'bear');
-        (gameEngineRef.current as any).setPlayerCharacter(2, players.p2.characterId || 'man');
-        console.log('Character assignments set in restart', { 
-          p1Character: players.p1.characterId || 'bear', 
-          p2Character: players.p2.characterId || 'man' 
-        });
-      }
-      
       gameEngineRef.current.start(song.id);
     }
   };
@@ -391,7 +367,10 @@ export const GameScreen: React.FC = () => {
   
   
   const CharacterPanel: React.FC<{ player: 1 | 2 }> = ({ player }) => {
-    const score = player === 1 ? gameplay.scoreP1 : gameplay.scoreP2;
+    // In multiplayer, use lobby scores; in single player, use local scores
+    const score = isMultiplayer 
+      ? (player === 1 ? gameplay.scoreP1 : gameplay.scoreP2) // These are synced from lobby
+      : (player === 1 ? gameplay.scoreP1 : gameplay.scoreP2);
     const combo = player === 1 ? gameplay.comboP1 : gameplay.comboP2;
     const accuracy = player === 1 ? gameplay.accuracyP1 : gameplay.accuracyP2;
     const characterId = player === 1 ? players.p1.characterId : players.p2.characterId;
@@ -481,13 +460,26 @@ export const GameScreen: React.FC = () => {
             >🧍</div>
           </div>
           <div className="flex justify-between text-[10px] mt-1 font-mono">
-            <span className="pixel-glow-green">BEAR {bearProgress.toFixed(1)}%</span>
-            {bearBoost && <span className="pixel-glow-yellow animate-pulse">BOOST!</span>}
-            <span className="pixel-glow-red">MAN {manProgress.toFixed(1)}%</span>
+            {isMultiplayer ? (
+              <>
+                <span className="pixel-glow-green">RED {bearProgress.toFixed(1)}%</span>
+                {bearBoost && <span className="pixel-glow-yellow animate-pulse">BOOST!</span>}
+                <span className="pixel-glow-red">BLUE {manProgress.toFixed(1)}%</span>
+              </>
+            ) : (
+              <>
+                <span className="pixel-glow-green">BEAR {bearProgress.toFixed(1)}%</span>
+                {bearBoost && <span className="pixel-glow-yellow animate-pulse">BOOST!</span>}
+                <span className="pixel-glow-red">MAN {manProgress.toFixed(1)}%</span>
+              </>
+            )}
           </div>
           {gameResult && (
             <div className="text-center mt-2 text-xs pixel-glow-pink">
-              {gameResult === 'bear_escaped' ? 'BEAR ESCAPED!' : 'MAN CAUGHT THE BEAR!'}
+              {isMultiplayer 
+                ? 'SONG COMPLETE!' 
+                : (gameResult === 'bear_escaped' ? 'BEAR ESCAPED!' : 'MAN CAUGHT THE BEAR!')
+              }
             </div>
           )}
         </div>
@@ -577,9 +569,9 @@ export const GameScreen: React.FC = () => {
               {playerWon ? 'VICTORY!' : 'DEFEAT!'}
             </h2>
             <p className={`text-2xl mb-6 ${playerWon ? 'pixel-glow-green' : 'pixel-glow-red'}`}>
-              {gameResult === 'bear_escaped' 
-                ? (playerWon ? 'BEAR ESCAPED! YOU WIN!' : 'BEAR ESCAPED! YOU LOSE!')
-                : (playerWon ? 'MAN CAUGHT THE BEAR! YOU WIN!' : 'MAN CAUGHT THE BEAR! YOU LOSE!')
+              {playerWon 
+                ? 'HIGHER SCORE! YOU WIN!' 
+                : 'LOWER SCORE! YOU LOSE!'
               }
             </p>
             <div className="text-sm pixel-glow-purple mb-4">

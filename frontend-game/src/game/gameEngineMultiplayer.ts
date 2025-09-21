@@ -76,7 +76,9 @@ export class GameEngine {
 
   private bearProgress = 10.0;
   private manProgress = 0.0;
-  // Removed single-player chase constants - now using score-based mechanics
+  private readonly MAN_CHASE_SPEED = 0.2;
+  private readonly BEAR_HIT_BOOST = 2.0;
+  private readonly BEAR_MISS_PENALTY = 0.5;
   private gameOver = false;
   private gameResult: 'bear_escaped' | 'man_caught' | null = null;
 
@@ -93,10 +95,6 @@ export class GameEngine {
   private goodHits = 0;
   private missedHits = 0;
   private onNoteResult: ((result: { judgment: Judgment; note: Note; player: number; accuracy: number }) => void) | null = null;
-  
-  // Multiplayer-specific tracking
-  private playerScores = { 1: 0, 2: 0 };
-  private playerCharacterAssignments = { 1: 'bear', 2: 'man' }; // Default assignments
   
   constructor(canvas: HTMLCanvasElement, audioContext: AudioContext, gainNode: GainNode) {
     this.canvas = canvas;
@@ -258,45 +256,6 @@ export class GameEngine {
     this.onNoteResult = callback;
   }
   
-  setPlayerCharacter(player: 1 | 2, characterId: string) {
-    this.playerCharacterAssignments[player] = characterId;
-    console.log('Player character assigned', { player, characterId });
-  }
-  
-  updatePlayerScore(player: 1 | 2, score: number) {
-    this.playerScores[player] = score;
-    this.updateChaseMechanics();
-  }
-  
-  private updateChaseMechanics() {
-    // Calculate relative performance between players
-    const p1Score = this.playerScores[1];
-    const p2Score = this.playerScores[2];
-    const totalScore = p1Score + p2Score;
-    
-    if (totalScore === 0) {
-      // No scores yet, keep default positions
-      return;
-    }
-    
-    // Calculate progress based on score ratio
-    const p1Ratio = p1Score / totalScore;
-    const p2Ratio = p2Score / totalScore;
-    
-    // Map to 0-100 range, with bear starting at 10% and man at 0%
-    this.bearProgress = 10 + (p1Ratio * 90);
-    this.manProgress = p2Ratio * 100;
-    
-    // Check win conditions
-    if (this.bearProgress >= 100) {
-      this.gameOver = true;
-      this.gameResult = 'bear_escaped';
-    } else if (this.manProgress >= this.bearProgress) {
-      this.gameOver = true;
-      this.gameResult = 'man_caught';
-    }
-  }
-  
 
   private gameLoop = () => {
     if (!this.running) return;
@@ -363,8 +322,22 @@ export class GameEngine {
        }
      }
      
-     // Chase mechanics are now handled by updateChaseMechanics() based on player scores
-     // No need for constant man chasing in multiplayer mode
+     // Update chase mechanics
+     if (!this.gameOver) {
+       // Man constantly chases at fixed speed
+       this.manProgress += (this.MAN_CHASE_SPEED * 16) / 1000; // Convert to per-frame
+       
+       // Check win/lose conditions
+       if (this.bearProgress >= 100) {
+         this.gameOver = true;
+         this.gameResult = 'bear_escaped';
+         console.log('Bear escaped!');
+       } else if (this.manProgress >= this.bearProgress) {
+         this.gameOver = true;
+         this.gameResult = 'man_caught';
+         console.log('Man caught the bear!');
+       }
+     }
    }
   
   private render() {
@@ -992,7 +965,8 @@ export class GameEngine {
     if (laneNotes.length === 0) {
       this.missedHits++;
       const accuracy = this.calculateAccuracy();
-      // In multiplayer, don't directly modify bear progress - let score-based mechanics handle it
+      this.bearProgress -= this.BEAR_MISS_PENALTY;
+      this.bearProgress = Math.max(0, this.bearProgress);
       if (this.onNoteResult) {
         this.onNoteResult({ judgment: { type: 'Miss', score: 0 }, note: null as unknown as Note, player, accuracy });
       }
@@ -1019,12 +993,15 @@ export class GameEngine {
     if (deltaMs <= this.PERFECT_WINDOW) {
       judgment = { type: 'Perfect', score: Math.floor(baseScore * typeBonus) };
       this.perfectHits++;
+      this.bearProgress += this.BEAR_HIT_BOOST * 1.5 * this.spacebarBoostMultiplier;
     } else if (deltaMs <= this.GREAT_WINDOW) {
       judgment = { type: 'Great', score: Math.floor(70 * typeBonus) };
       this.greatHits++;
+      this.bearProgress += this.BEAR_HIT_BOOST * this.spacebarBoostMultiplier;
     } else if (deltaMs <= this.GOOD_WINDOW) {
       judgment = { type: 'Good', score: Math.floor(40 * typeBonus) };
       this.goodHits++;
+      this.bearProgress += this.BEAR_HIT_BOOST * 0.7 * this.spacebarBoostMultiplier;
     } else {
       judgment = { type: 'Miss', score: 0 };
       this.missedHits++;
@@ -1229,3 +1206,5 @@ export class GameEngine {
     }
   }
 }
+
+
