@@ -67,28 +67,40 @@ export const GameScreen: React.FC = () => {
   }, []);
 
   const handleNoteResult = useCallback((result: { judgment: Judgment; note: Note; player: number; accuracy: number }) => {
-    const player = result.player; // Engine callback tells us which player (we trigger only for local currently)
+    const player = lobby.side === 'blue' ? 2 : 1; // authoritative local side
+    const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
     const currentScore = player === 1 ? scoreP1Ref.current : scoreP2Ref.current;
     const currentCombo = player === 1 ? comboP1Ref.current : comboP2Ref.current;
     const newScore = currentScore + result.judgment.score;
     const newCombo = result.judgment.type !== 'Miss' ? currentCombo + 1 : 0;
 
-    // Immediate local optimistic update (mirrors gameclient behavior)
-    updateGameplay({
-      [player === 1 ? 'scoreP1' : 'scoreP2']: newScore,
-      [player === 1 ? 'comboP1' : 'comboP2']: newCombo,
-      [player === 1 ? 'accuracyP1' : 'accuracyP2']: result.accuracy,
-    });
-
-    // Push to DB if this browser owns that player side
-    const conn = getConn();
-    const code = lobby.code;
-    const localPlayer = lobby.side === 'blue' ? 2 : 1;
-    if (conn && code && player === localPlayer && result.judgment.type !== 'Miss') {
-      try { LobbyApi.setScore(conn, code, newScore); } catch (e) { console.warn('setScore failed', e); }
+    if (isMultiplayer) {
+      // Multiplayer: DB is source of truth for scores. Only update combo/accuracy locally.
+      updateGameplay({
+        [player === 1 ? 'comboP1' : 'comboP2']: newCombo,
+        [player === 1 ? 'accuracyP1' : 'accuracyP2']: result.accuracy,
+      });
+      if (result.judgment.type !== 'Miss') {
+        const conn = getConn();
+        if (conn && lobby.code) {
+          try {
+            LobbyApi.setScore(conn, lobby.code, newScore);
+            console.log('[ScorePush]', { code: lobby.code, player, newScore });
+          } catch (e) {
+            console.warn('[ScorePushError]', { code: lobby.code, player, attempted: newScore, error: e });
+          }
+        }
+      }
+    } else {
+      // Solo mode: update everything locally.
+      updateGameplay({
+        [player === 1 ? 'scoreP1' : 'scoreP2']: newScore,
+        [player === 1 ? 'comboP1' : 'comboP2']: newCombo,
+        [player === 1 ? 'accuracyP1' : 'accuracyP2']: result.accuracy,
+      });
     }
 
-    // Floating +score popup
+    // Popup feedback (still shows immediately)
     if (result.judgment.score > 0) {
       const id = ++popupIdRef.current;
       setScorePopups(prev => ({
@@ -102,16 +114,16 @@ export const GameScreen: React.FC = () => {
         }));
       }, 650);
     }
-  }, [updateGameplay, lobby.code, lobby.side]);
+  }, [updateGameplay, lobby.code, lobby.side, lobby.mode, lobby.connectedP2]);
 
   const handleInput = useCallback((inputEvent: InputEvent) => {
     if (isPaused || !gameEngineRef.current) return;
-
+    const localPlayer = lobby.side === 'blue' ? 2 : 1;
     if (inputEvent.type === 'hit') {
-      const result = gameEngineRef.current.handleInput(inputEvent.lane, inputEvent.type, inputEvent.player);
+      const result = gameEngineRef.current.handleInput(inputEvent.lane, inputEvent.type, localPlayer);
       if (result.judgment) {
         console.log('NoteHit', {
-          player: inputEvent.player,
+          player: localPlayer,
           lane: inputEvent.lane,
           type: inputEvent.type,
           noteType: result.note?.type || 'none',
@@ -123,7 +135,7 @@ export const GameScreen: React.FC = () => {
     } else if (inputEvent.type === 'release') {
       gameEngineRef.current.handleRelease(inputEvent.lane);
     }
-  }, [isPaused]);
+  }, [isPaused, lobby.side]);
 
   // Function to sync game state to server
   const syncGameState = useCallback((bearProgress: number, manProgress: number, gameOver: boolean, gameResult?: string) => {
