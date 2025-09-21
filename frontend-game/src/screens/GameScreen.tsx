@@ -208,8 +208,8 @@ export const GameScreen: React.FC = () => {
         // Convert scores to progress (0-100)
         // Use a reasonable max score for conversion (e.g., 10000 points = 100% progress)
         const maxScoreForProgress = 10000;
-        currentBearProgress = Math.min(100, (redScore / maxScoreForProgress) * 100);
-        currentManProgress = Math.min(100, (blueScore / maxScoreForProgress) * 100);
+        currentBearProgress = Math.min(100, (blueScore / maxScoreForProgress) * 100);
+        currentManProgress = Math.min(100, (redScore / maxScoreForProgress) * 100);
       } else {
         // Single player uses engine stats
         currentBearProgress = stats.bearProgress;
