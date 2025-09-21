@@ -70,7 +70,12 @@ export const GameScreen: React.FC = () => {
   if (!lobby.side) { return; } // side not chosen yet (shouldn't happen in GameScreen but guard)
   const player = lobby.side === 'blue' ? 2 : 1; // authoritative local side
     const isMultiplayer = lobby.mode === 'host' || lobby.mode === 'join' || lobby.connectedP2;
-    const currentScore = player === 1 ? scoreP1Ref.current : scoreP2Ref.current;
+    
+    // In multiplayer, use the current gameplay scores directly
+    // In single player, use the refs for local calculation
+    const currentScore = isMultiplayer 
+      ? (player === 1 ? gameplay.scoreP1 : gameplay.scoreP2)
+      : (player === 1 ? scoreP1Ref.current : scoreP2Ref.current);
     const currentCombo = player === 1 ? comboP1Ref.current : comboP2Ref.current;
     const newScore = currentScore + result.judgment.score;
     const newCombo = result.judgment.type !== 'Miss' ? currentCombo + 1 : 0;
@@ -85,11 +90,12 @@ export const GameScreen: React.FC = () => {
         const conn = getConn();
         if (conn && lobby.code) {
           try {
+            // In multiplayer, send the total score (backend expects total, not increment)
             LobbyApi.setScore(conn, lobby.code, newScore);
             console.log('[ScorePush]', { 
               code: lobby.code, 
               player, 
-              newScore, 
+              newScore,
               judgment: result.judgment.type,
               lane: result.note?.lane,
               side: lobby.side
