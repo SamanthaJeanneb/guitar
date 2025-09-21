@@ -93,6 +93,11 @@ export const GameScreen: React.FC = () => {
           }
         }
       }
+      
+      // Update the multiplayer engine with the new score for chase mechanics
+      if (gameEngineRef.current && 'updatePlayerScore' in gameEngineRef.current) {
+        (gameEngineRef.current as any).updatePlayerScore(player, newScore);
+      }
     } else {
       // Solo mode: update everything locally.
       updateGameplay({
@@ -183,6 +188,12 @@ export const GameScreen: React.FC = () => {
     // Set up note result callback
     gameEngineRef.current.setNoteResultCallback(handleNoteResult);
     
+    // Set character assignments for multiplayer engine
+    if (isMultiplayer && 'setPlayerCharacter' in gameEngineRef.current) {
+      (gameEngineRef.current as any).setPlayerCharacter(1, players.p1.characterId || 'bear');
+      (gameEngineRef.current as any).setPlayerCharacter(2, players.p2.characterId || 'man');
+    }
+    
   // Setup input handling
   const cleanup = inputHandlerRef.current.onInput(handleInput);
     
@@ -198,6 +209,12 @@ export const GameScreen: React.FC = () => {
       const currentManProgress = isMultiplayer ? gameplay.manProgress : stats.manProgress;
       const currentGameOver = isMultiplayer ? gameplay.synchronizedGameOver : stats.gameOver;
       const currentGameResult = isMultiplayer ? gameplay.synchronizedGameResult : stats.gameResult;
+      
+      // Update multiplayer engine with synchronized scores for chase mechanics
+      if (isMultiplayer && gameEngineRef.current && 'updatePlayerScore' in gameEngineRef.current) {
+        (gameEngineRef.current as any).updatePlayerScore(1, gameplay.scoreP1);
+        (gameEngineRef.current as any).updatePlayerScore(2, gameplay.scoreP2);
+      }
       
       setBearProgress(currentBearProgress);
       setManProgress(currentManProgress);
