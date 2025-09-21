@@ -76,15 +76,11 @@ export class GameEngine {
 
   private bearProgress = 10.0;
   private manProgress = 0.0;
+  private readonly MAN_CHASE_SPEED = 0.2;
   private readonly BEAR_HIT_BOOST = 2.0;
   private readonly BEAR_MISS_PENALTY = 0.5;
   private gameOver = false;
   private gameResult: 'bear_escaped' | 'man_caught' | null = null;
-  
-  // Multiplayer-specific properties
-  private playerScores = { 1: 0, 2: 0 };
-  private playerCharacters = { 1: 'bear', 2: 'man' }; // Default assignments
-  private readonly SCORE_TO_PROGRESS_RATIO = 0.01; // Convert score to progress (1000 score = 10% progress)
 
   private spacebarPressed = false;
   private spacebarBoostMultiplier = 1.0;
@@ -326,12 +322,21 @@ export class GameEngine {
        }
      }
      
-     // Update chase mechanics - now handled by updatePlayerScore method
-     // The old time-based chase is replaced with score-based chase in multiplayer
+     // Update chase mechanics
      if (!this.gameOver) {
-       // Win conditions are now checked in checkWinConditions() method
-       // which is called whenever player scores are updated
-       this.checkWinConditions();
+       // Man constantly chases at fixed speed
+       this.manProgress += (this.MAN_CHASE_SPEED * 16) / 1000; // Convert to per-frame
+       
+       // Check win/lose conditions
+       if (this.bearProgress >= 100) {
+         this.gameOver = true;
+         this.gameResult = 'bear_escaped';
+         console.log('Bear escaped!');
+       } else if (this.manProgress >= this.bearProgress) {
+         this.gameOver = true;
+         this.gameResult = 'man_caught';
+         console.log('Man caught the bear!');
+       }
      }
    }
   
@@ -1090,74 +1095,6 @@ export class GameEngine {
   
   setVolume(volume: number) {
     this.gainNode.gain.value = volume;
-  }
-
-  // Multiplayer-specific methods
-  updatePlayerScore(player: 1 | 2, score: number) {
-    console.log('[MultiplayerEngine] updatePlayerScore called', { player, score, previousScore: this.playerScores[player] });
-    this.playerScores[player] = score;
-    
-    // Update progress based on character assignment and score
-    const character = this.playerCharacters[player];
-    if (character === 'bear') {
-      // Bear progress is based on their score (higher score = more progress)
-      this.bearProgress = 10.0 + (score * this.SCORE_TO_PROGRESS_RATIO);
-      console.log('[MultiplayerEngine] Bear progress updated', { player, score, bearProgress: this.bearProgress });
-    } else if (character === 'man') {
-      // Man progress is based on their score (higher score = more progress)
-      this.manProgress = score * this.SCORE_TO_PROGRESS_RATIO;
-      console.log('[MultiplayerEngine] Man progress updated', { player, score, manProgress: this.manProgress });
-    }
-    
-    // Check win conditions after updating progress
-    this.checkWinConditions();
-  }
-
-  setPlayerCharacter(player: 1 | 2, characterId: string) {
-    console.log('[MultiplayerEngine] setPlayerCharacter called', { player, characterId, previousCharacter: this.playerCharacters[player] });
-    this.playerCharacters[player] = characterId;
-    
-    // Reset progress when characters are assigned
-    if (characterId === 'bear') {
-      this.bearProgress = 10.0 + (this.playerScores[player] * this.SCORE_TO_PROGRESS_RATIO);
-      console.log('[MultiplayerEngine] Bear character assigned', { player, bearProgress: this.bearProgress });
-    } else if (characterId === 'man') {
-      this.manProgress = this.playerScores[player] * this.SCORE_TO_PROGRESS_RATIO;
-      console.log('[MultiplayerEngine] Man character assigned', { player, manProgress: this.manProgress });
-    }
-  }
-
-  private checkWinConditions() {
-    if (this.gameOver) return;
-    
-    console.log('[MultiplayerEngine] Checking win conditions', { 
-      bearProgress: this.bearProgress, 
-      manProgress: this.manProgress,
-      bearCharacter: this.playerCharacters[1] === 'bear' ? 'P1' : 'P2',
-      manCharacter: this.playerCharacters[1] === 'man' ? 'P1' : 'P2'
-    });
-    
-    // Bear escapes if they reach 100% progress
-    if (this.bearProgress >= 100) {
-      this.gameOver = true;
-      this.gameResult = 'bear_escaped';
-      console.log('[MultiplayerEngine] Bear escaped! Game over', { 
-        bearProgress: this.bearProgress,
-        bearPlayer: this.playerCharacters[1] === 'bear' ? 1 : 2,
-        manPlayer: this.playerCharacters[1] === 'man' ? 1 : 2
-      });
-    } 
-    // Man catches bear if man progress >= bear progress
-    else if (this.manProgress >= this.bearProgress) {
-      this.gameOver = true;
-      this.gameResult = 'man_caught';
-      console.log('[MultiplayerEngine] Man caught the bear! Game over', { 
-        bearProgress: this.bearProgress,
-        manProgress: this.manProgress,
-        bearPlayer: this.playerCharacters[1] === 'bear' ? 1 : 2,
-        manPlayer: this.playerCharacters[1] === 'man' ? 1 : 2
-      });
-    }
   }
   
   // Method to add drum notes for testing
