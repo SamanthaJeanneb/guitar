@@ -209,12 +209,9 @@ export const GameScreen: React.FC = () => {
       if (isMultiplayer) {
         // In multiplayer, use scores to determine bear vs man progress
         // Bear player (red) vs Man player (blue)
-        const redScore = gameplay.scoreP1; // This comes from lobby.redScore
-        const blueScore = gameplay.scoreP2; // This comes from lobby.blueScore
-        
         console.log('Multiplayer Progress Debug', {
-          redScore,
-          blueScore,
+          redScore: gameplay.scoreP1,
+          blueScore: gameplay.scoreP2,
           redPlayer: lobby.side === 'red' ? 'local' : 'remote',
           bluePlayer: lobby.side === 'blue' ? 'local' : 'remote'
         });
@@ -222,8 +219,8 @@ export const GameScreen: React.FC = () => {
         // Convert scores to progress (0-100)
         // Use a reasonable max score for conversion (e.g., 10000 points = 100% progress)
         const maxScoreForProgress = 10000;
-        currentBearProgress = Math.min(100, (redScore / maxScoreForProgress) * 100);
-        currentManProgress = Math.min(100, (blueScore / maxScoreForProgress) * 100);
+        currentBearProgress = Math.min(100, (gameplay.scoreP1 / maxScoreForProgress) * 100);
+        currentManProgress = Math.min(100, (gameplay.scoreP2 / maxScoreForProgress) * 100);
         
         console.log('Multiplayer Progress Calculated', {
           bearProgress: currentBearProgress,
