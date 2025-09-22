@@ -274,8 +274,11 @@ export class GameEngine {
         if (note.y > this.HIT_LINE_Y + 100 && !note.hit) {
           note.hit = true;
           this.missedHits++;
+          // Small setback for the bear on auto-miss
+          this.bearProgress -= this.BEAR_MISS_PENALTY;
+          this.bearProgress = Math.max(0, this.bearProgress);
           const accuracy = this.calculateAccuracy();
-          
+
           console.log('NoteMiss', { 
             player: 1, // Default to player 1 for auto-misses
             lane: note.lane, 
@@ -285,7 +288,7 @@ export class GameEngine {
             player: 1, 
             accuracy: accuracy 
           });
-          
+
           if (this.onNoteResult) {
             this.onNoteResult({
               judgment: { type: 'Miss', score: 0 },
@@ -867,6 +870,9 @@ export class GameEngine {
     } else {
       judgment = { type: 'Miss', score: 0 };
       this.missedHits++;
+      // Small setback for the bear on player miss
+      this.bearProgress -= this.BEAR_MISS_PENALTY;
+      this.bearProgress = Math.max(0, this.bearProgress);
       console.log('NoteMiss', { player, lane, deltaMs });
     }
 
