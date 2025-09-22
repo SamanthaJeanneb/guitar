@@ -1,6 +1,4 @@
-# 🎸 Guitar Super Power
-
-A guitar game with AI-powered chart generation from MP3 files using Google's Gemini API and gesture-based controls.
+A rythm game with AI-powered chart generation from MP3 files using Google's Gemini API and gesture-based controls.
 
 ## Features
 
@@ -14,7 +12,7 @@ A guitar game with AI-powered chart generation from MP3 files using Google's Gem
 ### Prerequisites
 
 - Node.js (v16 or higher)
-- Python 3.8+
+- Python 3.12
 - Google Gemini API key
 
 ### 1. Backend Setup
@@ -38,7 +36,7 @@ npm run dev
 ### 2. Frontend Setup
 
 ```bash
-cd frontend
+cd frontend-game
 npm install
 npm run dev
 ```
@@ -48,7 +46,6 @@ npm run dev
 ```bash
 cd backend
 pip install opencv-python mediapipe numpy pynput
-python GuitarSuperPower.py
 ```
 
 ## Getting a Gemini API Key
@@ -70,35 +67,11 @@ python GuitarSuperPower.py
 - `GET /api/charts` - List all generated charts
 - `GET /api/charts/:filename` - Download specific chart file
 
-## Chart Format
-
-The generated charts follow a JSON structure compatible with guitar games:
-- Song metadata (name, artist, difficulty)
-- Timing information (tempo, time signatures)
-- Note patterns and chord progressions
-- Difficulty levels and sections
-
-## Development
-
-### Backend Development
-```bash
-cd backend
-npm run dev  # Uses nodemon for auto-restart
-```
-
-### Frontend Development
-```bash
-cd frontend
-npm run dev  # Vite development server
-```
-
 ## Technologies Used
 
-- **Backend**: Node.js, Express, Socket.IO, Multer
 - **Frontend**: React, TypeScript, Vite
 - **AI**: Google Gemini API
 - **Gesture Recognition**: OpenCV, MediaPipe
-- **File Processing**: FFmpeg, fs-extra
 
 ## Contributing
 
@@ -106,7 +79,3 @@ npm run dev  # Vite development server
 2. Create a feature branch
 3. Make your changes
 4. Submit a pull request
-
-## License
-
-MIT License - see LICENSE file for details
