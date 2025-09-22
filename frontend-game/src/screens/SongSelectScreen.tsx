@@ -517,7 +517,7 @@ export const SongSelectScreen: React.FC = () => {
                   <div className="text-center">
                     <h4 className="text-sm pixel-glow-pink mb-2">PLAYER 1</h4>
                     <div className={`text-lg ${lobby.p1Ready ? 'text-green-400' : 'text-yellow-400'}`}>
-                      {lobby.p1Ready ? '✓ READY' : '⏳ NOT READY'}
+                      {lobby.p1Ready ? '✓ READY' : 'NOT READY'}
                     </div>
                     <button
                       onClick={() => toggleReady(1)}
@@ -533,7 +533,7 @@ export const SongSelectScreen: React.FC = () => {
                   <div className="text-center">
                     <h4 className="text-sm pixel-glow-purple mb-2">PLAYER 2</h4>
                     <div className={`text-lg ${lobby.p2Ready ? 'text-green-400' : 'text-yellow-400'}`}>
-                      {lobby.p2Ready ? '✓ READY' : '⏳ NOT READY'}
+                      {lobby.p2Ready ? '✓ READY' : 'NOT READY'}
                     </div>
                     {/* Only show toggle for player 2 if this client IS player 2 */}
                     {lobby.side === 'blue' && (
