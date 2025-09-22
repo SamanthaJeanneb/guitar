@@ -58,13 +58,13 @@ export class InputHandler {
     const timestamp = performance.now();
     
     switch (key.toLowerCase()) {
-      case 'v':
-        return { player: 1, action: 'LANE_0', timestamp, lane: 0, type: 'hit' };
-      case 'c':
-        return { player: 1, action: 'LANE_1', timestamp, lane: 1, type: 'hit' };
-      case 'x':
-        return { player: 1, action: 'LANE_2', timestamp, lane: 2, type: 'hit' };
       case 'z':
+        return { player: 1, action: 'LANE_0', timestamp, lane: 0, type: 'hit' };
+      case 'x':
+        return { player: 1, action: 'LANE_1', timestamp, lane: 1, type: 'hit' };
+      case 'c':
+        return { player: 1, action: 'LANE_2', timestamp, lane: 2, type: 'hit' };
+      case 'v':
         return { player: 1, action: 'LANE_3', timestamp, lane: 3, type: 'hit' };
       
       // Player 2 controls
