@@ -66,8 +66,8 @@ export class GameEngine {
 
   private bearProgress = 10.0;
   private manProgress = 0.0;
-  private readonly MAN_CHASE_SPEED = 0.2;
-  private readonly BEAR_HIT_BOOST = 2.0;
+  private readonly MAN_CHASE_SPEED = 0.5;
+  private readonly BEAR_HIT_BOOST = 1.0;
   private readonly BEAR_MISS_PENALTY = 0.5;
   private gameOver = false;
   private gameResult: 'bear_escaped' | 'man_caught' | null = null;
