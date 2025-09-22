@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { getChartFromIDB } from '../lib/idbAudio';
 
 export interface Note {
   id: string;
@@ -121,25 +122,37 @@ export class GameEngine {
   
   private async generateChartFromFile(songId: string, difficulty: 'expert' | 'hard' | 'normal' | 'easy' = 'expert') {
     try {
-      const tryLoadChart = async (path: string) => {
-        const res = await fetch(path, { cache: 'no-cache' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.text();
-      };
-
-      const candidates = [
-        `/songs/${songId}/chart.chart`,
-        `/songs/${songId}/waves.chart`,
-        `/songs/${songId}/notes.chart`,
-      ];
-
+      // First try to load chart text from IndexedDB (client-side persisted charts)
       let text = '';
-      for (const url of candidates) {
-        try {
-          text = await tryLoadChart(url);
-          if (text && /\[Song\]/.test(text) && /\[SyncTrack\]/.test(text)) break;
-        } catch {
-          // try next
+      try {
+        text = await getChartFromIDB(`${songId}-chart`);
+        if (text) {
+          console.log('Loaded chart from IDB for', songId);
+        }
+      } catch {
+        // Not found in IDB — fall back to network candidates
+      }
+
+      if (!text) {
+        const tryLoadChart = async (path: string) => {
+          const res = await fetch(path, { cache: 'no-cache' });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.text();
+        };
+
+        const candidates = [
+          `/songs/${songId}/chart.chart`,
+          `/songs/${songId}/waves.chart`,
+          `/songs/${songId}/notes.chart`,
+        ];
+
+        for (const url of candidates) {
+          try {
+            text = await tryLoadChart(url);
+            if (text && /\[Song\]/.test(text) && /\[SyncTrack\]/.test(text)) break;
+          } catch {
+            // try next
+          }
         }
       }
 

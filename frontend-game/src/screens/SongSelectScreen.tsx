@@ -2,6 +2,7 @@ import React from 'react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useGameStore, Song } from '../store/gameStore';
 import { useGeminiApi } from '../hooks/useGeminiApi';
+import { saveFileToIDB, getFileBlobFromIDB, saveChartToIDB } from '../lib/idbAudio';
 
 interface Character {
   id: string;
@@ -83,7 +84,7 @@ export const SongSelectScreen: React.FC = () => {
   const [lobbyJoinCode, setLobbyJoinCode] = useState('');
   const geminiApi = useGeminiApi();
 
-  const playPreview = useCallback((songItem: Song) => {
+  const playPreview = useCallback(async (songItem: Song) => {
     // Stop current preview if playing
     if (previewAudio && currentSongRef.current !== songItem.id) {
       previewAudio.pause();
@@ -95,7 +96,18 @@ export const SongSelectScreen: React.FC = () => {
       return;
     }
 
-    const audio = new Audio(`/songs/${songItem.id}/song.ogg`);
+    // Try to play from IndexedDB first (client-stored uploaded files)
+    let audioUrl: string | null = null;
+    try {
+      const blob = await getFileBlobFromIDB(songItem.id);
+      audioUrl = URL.createObjectURL(blob);
+    } catch {
+      // Not in IDB — fall back to server-hosted file
+      // Try .ogg first, then .mp3
+      audioUrl = `/songs/${songItem.id}/song.ogg`;
+    }
+
+    const audio = new Audio(audioUrl as string);
     audio.volume = 0; // Controlled by Web Audio API
     audio.loop = true; // Loop the preview
 
@@ -118,6 +130,10 @@ export const SongSelectScreen: React.FC = () => {
       .catch((err) => {
         console.warn('Preview playback failed:', err);
       });
+    // When the audio ends or is replaced, revoke object URL if we created one
+    audio.addEventListener('ended', () => {
+      if (audioUrl && audioUrl.startsWith('blob:')) URL.revokeObjectURL(audioUrl as string);
+    });
   }, [previewAudio]);
 
   useEffect(() => {
@@ -296,24 +312,37 @@ export const SongSelectScreen: React.FC = () => {
       if (result.success) {
         // Optionally generate chart using Gemini if enabled
         if (generateChart) {
+          let chartContent: string | undefined;
           try {
             const songName = result.song.title;
-            const chartContent = await geminiApi.generateChart(songName);
-            
-            // Save chart to the song directory
-            const chartResponse = await fetch('http://localhost:3001/api/save-chart', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                songName: result.song.id,
-                chartData: chartContent
-              })
-            });
-            
-            if (chartResponse.ok) {
-              console.log('Chart generated and saved for:', songName);
+            chartContent = await geminiApi.generateChart(songName);
+
+            // Save chart to the song directory on the server (local dev)
+            try {
+              const chartResponse = await fetch('http://localhost:3001/api/save-chart', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  songName: result.song.id,
+                  chartData: chartContent
+                })
+              });
+              if (chartResponse.ok) {
+                console.log('Chart generated and saved for:', songName);
+              }
+            } catch (saveErr) {
+              // If server-side save fails (e.g., static hosting), continue — we'll persist to IDB below
+              console.warn('Server-side chart save failed, will persist to IDB instead', saveErr);
+            }
+
+            // Persist chart text to IndexedDB so static hosts can play it back
+            try {
+              await saveChartToIDB(`${result.song.id}-chart`, chartContent);
+              console.log('Chart saved to IDB for song:', result.song.id);
+            } catch (_idbChartErr) {
+              console.warn('Failed to save generated chart to IDB', _idbChartErr);
             }
           } catch (chartError) {
             console.warn('Chart generation failed:', chartError);
@@ -322,17 +351,39 @@ export const SongSelectScreen: React.FC = () => {
         }
         
         // Reload songs from the updated index.json
-        const songsResponse = await fetch('/songs/index.json', { cache: 'no-cache' });
-        if (songsResponse.ok) {
-          const updatedSongs: Song[] = await songsResponse.json();
-          setSongs(updatedSongs);
-          
-          // Find and select the new song
-          const newSongIndex = updatedSongs.findIndex(song => song.id === result.song.id);
-          if (newSongIndex >= 0) {
-            setSelectedSongIndex(newSongIndex);
-            selectSong(updatedSongs[newSongIndex]);
+        try {
+          const songsResponse = await fetch('/songs/index.json', { cache: 'no-cache' });
+          if (songsResponse.ok) {
+            const updatedSongs: Song[] = await songsResponse.json();
+            setSongs(updatedSongs);
+            // Find and select the new song
+            const newSongIndex = updatedSongs.findIndex(song => song.id === result.song.id);
+            if (newSongIndex >= 0) {
+              setSelectedSongIndex(newSongIndex);
+              selectSong(updatedSongs[newSongIndex]);
+            }
           }
+        } catch {
+          // If fetching index.json fails (e.g., Vercel static hosting), fall back to saving the uploaded file to IndexedDB
+          try {
+            if (uploadFile) {
+              await saveFileToIDB(result.song.id, uploadFile);
+              // Add to local songs array so it's immediately selectable
+              const localEntry: Song = { id: result.song.id, title: result.song.title, bpm: result.song.bpm || 120, difficulty: result.song.difficulty || 'Medium' };
+              setSongs(prev => [...prev, localEntry]);
+              setSelectedSongIndex(songs.length);
+              selectSong(localEntry);
+            }
+          } catch (_idbErr) {
+            console.warn('Failed to save uploaded file to IDB fallback', _idbErr);
+          }
+        }
+
+        // Also persist the uploaded file to IndexedDB for reliable playback (useful when hosting static on Vercel)
+        try {
+          if (uploadFile) await saveFileToIDB(result.song.id, uploadFile);
+        } catch (_idbErr) {
+          console.warn('saveFileToIDB failed', _idbErr);
         }
         
         console.log('Song uploaded successfully:', result.song);
