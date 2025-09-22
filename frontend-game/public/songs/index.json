@@ -16,5 +16,17 @@
     "title": "GNARLY",
     "bpm": 120,
     "difficulty": "Medium"
+  },
+  {
+    "id": "Runaway_Baby",
+    "title": "RUNAWAY BABY",
+    "bpm": 120,
+    "difficulty": "Medium"
+  },
+  {
+    "id": "Witch_Doctor",
+    "title": "WITCH DOCTOR",
+    "bpm": 120,
+    "difficulty": "Medium"
   }
 ]

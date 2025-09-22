@@ -107,3 +107,5 @@ The song upload feature now includes an optional checkbox to generate charts usi
 4. Update the song list
 
 This provides a complete workflow for adding songs with AI-generated charts to your game.
+
+
