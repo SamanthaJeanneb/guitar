@@ -66,7 +66,8 @@ export class GameEngine {
 
   private bearProgress = 10.0;
   private manProgress = 0.0;
-  private readonly MAN_CHASE_SPEED = 0.5;
+  // Chase speed for the man — make mutable so we can tune it per-song BPM
+  private MAN_CHASE_SPEED = 0.5;
   private readonly BEAR_HIT_BOOST = 1.0;
   private readonly BEAR_MISS_PENALTY = 0.5;
   private gameOver = false;
@@ -229,6 +230,23 @@ export class GameEngine {
     this.audioElement.addEventListener('ended', () => {
       console.log('MusicEnd', { songId });
     });
+
+    this.updateChaseSpeedFromBpm(songId).catch(err => console.warn('BPMLookupFailed', err));
+  }
+
+  private async updateChaseSpeedFromBpm(songId: string) {
+    try {
+      const res = await fetch('/songs/index.json', { cache: 'no-cache' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const list: Array<{ id: string; bpm?: number }> = await res.json();
+      const entry = list.find(s => s.id === songId);
+      const bpm = entry?.bpm ?? 120;
+      // simple threshold: >=140 -> 0.5, else -> 0.25 - we can update this later with more granularity/ game difficulty selection
+      this.MAN_CHASE_SPEED = bpm >= 140 ? 0.5 : 0.25;
+      console.log('ChaseSpeedSet', { songId, bpm, MAN_CHASE_SPEED: this.MAN_CHASE_SPEED });
+    } catch (err) {
+      console.warn('updateChaseSpeedFromBpm error', err);
+    }
   }
   
   setNoteResultCallback(callback: (result: { judgment: Judgment; note: Note; player: number; accuracy: number }) => void) {
