@@ -60,7 +60,7 @@ export const TitleScreen: React.FC = () => {
             SAVE THE BEAR
           </h1>
           <div className="pixel-glow-purple text-xl mb-4">
-            ARCADE EDITION
+            SAVE TOUCHDOWN BY PLAYING SICK BEATS
           </div>
         </div>
         {/* Start Prompt */}
