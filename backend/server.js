@@ -110,7 +110,7 @@ async function generateChartFromSongName(songName) {
    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
   
    // Generate chart from song name only - Gemini will search for all information
-   const prompt = `You are a Clone Hero chart creator. Search for information about the song "${songName}" and create a complete, playable Clone Hero .chart file.
+   const prompt = `You are a Clone Hero chart creator. Search about the song "${songName}" and create a complete, playable Clone Hero .chart file.
 
 
 CRITICAL REQUIREMENTS:
