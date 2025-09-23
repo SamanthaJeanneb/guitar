@@ -103,6 +103,8 @@ function AppWithTest() {
             ? '/images/bordergame.png'
             : currentScreen === 'MODE_SELECT'
             ? '/images/bordermodeselect.png'
+            : currentScreen === 'HOW_TO_PLAY'
+            ? '/images/bordersongselect.png'
             : '/images/outline.png'
         }
         alt="Screen Border"
