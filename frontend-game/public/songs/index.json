@@ -28,5 +28,11 @@
     "title": "WITCH DOCTOR",
     "bpm": 120,
     "difficulty": "Medium"
+  },
+  {
+    "id": "Vienna",
+    "title": "VIENNA",
+    "bpm": 125,
+    "difficulty": "Hard"
   }
 ]
