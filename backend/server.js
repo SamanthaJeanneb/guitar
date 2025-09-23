@@ -11,19 +11,15 @@ require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, {
- cors: {
-   origin: "http://localhost:5173",
-   methods: ["GET", "POST"]
- }
-});
+const io = socketIo(server);
 
 
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('uploads'));
 
+// Serve uploaded songs at /songs (files stored under backend/uploads/<id>/song.ogg)
+app.use('/songs', express.static(path.join(__dirname, 'uploads')));
 
 // Serve the web interface
 app.use(express.static(path.join(__dirname, 'public')));
@@ -1076,65 +1072,36 @@ app.post('/api/save-chart', async (req, res) => {
 // Upload song endpoint
 app.post('/api/upload-song', upload.single('song'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
     const originalName = req.file.originalname;
     const songName = path.parse(originalName).name; // Remove extension
     const cleanSongName = songName.replace(/[^a-zA-Z0-9\s\-_]/g, '').replace(/\s+/g, '_');
-    
-    // Paths for the new song directory and files
-    const songsDir = path.join(__dirname, '..', 'frontend-game', 'public', 'songs');
-    const songDir = path.join(songsDir, cleanSongName);
-    const finalSongPath = path.join(songDir, 'song.mp3');
-    const indexJsonPath = path.join(songsDir, 'index.json');
 
-    // Create song directory
+    // Save into backend/uploads/<cleanSongName>/song.ogg so /songs/<id>/song.ogg is served
+    const songDir = path.join(uploadsDir, cleanSongName);
     await fs.ensureDir(songDir);
+    const destPath = path.join(songDir, 'song.ogg');
+    await fs.move(req.file.path, destPath, { overwrite: true });
 
-    // Move uploaded file to the song directory as song.mp3
-    await fs.move(req.file.path, finalSongPath);
-
-    // Read current index.json
+    // Update uploads/index.json
+    const indexJsonPath = path.join(uploadsDir, 'index.json');
     let songs = [];
-    if (await fs.pathExists(indexJsonPath)) {
-      const indexContent = await fs.readFile(indexJsonPath, 'utf8');
-      songs = JSON.parse(indexContent);
-    }
-
-    // Check if song already exists
-    const existingSongIndex = songs.findIndex(song => song.id === cleanSongName);
-    if (existingSongIndex >= 0) {
-      songs[existingSongIndex] = {
-        id: cleanSongName,
-        title: songName.toUpperCase(),
-        bpm: 120,
-        difficulty: 'Medium'
-      };
-    } else {
-      // Add new song to index
-      songs.push({
-        id: cleanSongName,
-        title: songName.toUpperCase(),
-        bpm: 120,
-        difficulty: 'Medium'
-      });
-    }
-
-    // Write updated index.json
-    await fs.writeFile(indexJsonPath, JSON.stringify(songs, null, 2));
-
-    res.json({ 
-      success: true, 
-      song: {
-        id: cleanSongName,
-        title: songName.toUpperCase(),
-        bpm: 120,
-        difficulty: 'Medium'
+    try {
+      if (await fs.pathExists(indexJsonPath)) {
+        const indexContent = await fs.readFile(indexJsonPath, 'utf8');
+        songs = JSON.parse(indexContent);
       }
-    });
+    } catch (e) {
+      songs = [];
+    }
 
+    const meta = { id: cleanSongName, title: songName.toUpperCase(), bpm: 120, difficulty: 'Medium' };
+    const existingIndex = songs.findIndex(s => s.id === cleanSongName);
+    if (existingIndex >= 0) songs[existingIndex] = meta; else songs.push(meta);
+    await fs.writeFile(indexJsonPath, JSON.stringify(songs, null, 2), 'utf8');
+
+    res.json({ success: true, song: meta });
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ error: 'Failed to upload song' });

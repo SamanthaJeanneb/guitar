@@ -293,12 +293,53 @@ export const SongSelectScreen: React.FC = () => {
     setIsGenerating(true);
     
     try {
+  const hasServer = Boolean((import.meta.env.VITE_API_BASE as string) || (window.location.hostname === 'localhost' ? 'http://localhost:3001' : '')) || window.location.hostname === 'localhost';
+
+      if (!hasServer && typeof window !== 'undefined') {
+        try {
+          const safeId = (uploadFile.name || 'song').replace(/[^a-z0-9-]/gi, '_').toLowerCase() + '-' + Date.now();
+          // Persist audio to IDB for playback
+          await saveFileToIDB(safeId, uploadFile);
+
+          const localEntry: Song = { id: safeId, title: (uploadFile.name || 'NEW SONG').replace(/\.[^/.]+$/, '').toUpperCase(), bpm: 120, difficulty: 'Medium' };
+          setSongs(prev => [...prev, localEntry]);
+          setSelectedSongIndex(songs.length);
+          selectSong(localEntry);
+
+          // If requesting chart generation and gemini hook is available, run it client-side
+          if (generateChart) {
+            try {
+              const songName = localEntry.title;
+              const chartContent = await geminiApi.generateChart(songName);
+              // Save chart into IDB for engine consumption
+              await saveChartToIDB(`${safeId}-chart`, chartContent);
+              console.log('Chart generated and saved to IDB for', safeId);
+            } catch (chartErr) {
+              console.warn('Client-side chart generation failed or no client key available', chartErr);
+            }
+          }
+
+          // Reset and return early (no server roundtrip)
+          setUploadFile(null);
+          setShowUpload(false);
+          setIsGenerating(false);
+          setGenerateChart(false);
+          return;
+        } catch (clientErr) {
+          console.warn('Client-side upload fallback failed', clientErr);
+          // fall through to try server upload (if available)
+        }
+      }
       // Create FormData for file upload
       const formData = new FormData();
       formData.append('song', uploadFile);
       
-      // Upload to backend
-      const response = await fetch('http://localhost:3001/api/upload-song', {
+  // Build upload URL from env or sensible fallback
+  const API_BASE = (import.meta.env.VITE_API_BASE as string) || (window.location.hostname === 'localhost' ? 'http://localhost:3001' : '');
+  const uploadUrl = API_BASE ? `${API_BASE}/api/upload-song` : '/api/upload-song';
+
+  // Upload to backend
+  const response = await fetch(uploadUrl, {
         method: 'POST',
         body: formData,
       });
@@ -319,7 +360,9 @@ export const SongSelectScreen: React.FC = () => {
 
             // Save chart to the song directory on the server (local dev)
             try {
-              const chartResponse = await fetch('http://localhost:3001/api/save-chart', {
+              const API_BASE = (import.meta.env.VITE_API_BASE as string) || (window.location.hostname === 'localhost' ? 'http://localhost:3001' : '');
+              const saveChartUrl = API_BASE ? `${API_BASE}/api/save-chart` : '/api/save-chart';
+              const chartResponse = await fetch(saveChartUrl, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
