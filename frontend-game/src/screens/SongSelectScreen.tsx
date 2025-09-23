@@ -153,6 +153,7 @@ export const SongSelectScreen: React.FC = () => {
         console.warn('Failed to load songs manifest, falling back to IDB', e);
         try {
           const local = await getSongsIndex();
+          console.log('IDB songs loaded on mount:', local);
           const localSongs = (local as unknown[]).map((s: unknown) => s as Song);
           setSongs(localSongs);
           if (localSongs.length > 0 && !song) {
@@ -317,6 +318,12 @@ export const SongSelectScreen: React.FC = () => {
           const newList = [...songs, localEntry];
           setSongs(newList);
           try { await saveSongsIndex(newList); } catch { /* ignore */ }
+          try {
+            const dbg = await getSongsIndex();
+            console.log('IDB after save (client-only fallback):', dbg);
+          } catch (dbgErr) {
+            console.warn('Failed to read songs index after save (client-only)', dbgErr);
+          }
           setSelectedSongIndex(newList.length - 1);
           selectSong(localEntry);
 
@@ -435,7 +442,13 @@ export const SongSelectScreen: React.FC = () => {
               const newList = [...songs, localEntry];
               setSongs(newList);
               persistList = newList;
-              try { await saveSongsIndex(newList); } catch { /* ignore */ }
+                  try { await saveSongsIndex(newList); } catch { /* ignore */ }
+                  try {
+                    const dbg = await getSongsIndex();
+                    console.log('IDB after save (upload fallback):', dbg);
+                  } catch (dbgErr) {
+                    console.warn('Failed to read songs index after save (upload fallback)', dbgErr);
+                  }
               setSelectedSongIndex(newList.length - 1);
               selectSong(localEntry);
             }
@@ -451,6 +464,12 @@ export const SongSelectScreen: React.FC = () => {
           // captured persistList when available; otherwise fall back to current `songs`.
           const toPersist = persistList ?? songs;
           try { await saveSongsIndex(toPersist); } catch { /* ignore */ }
+          try {
+            const dbg = await getSongsIndex();
+            console.log('IDB after save (final persist):', dbg);
+          } catch (dbgErr) {
+            console.warn('Failed to read songs index after final persist', dbgErr);
+          }
         } catch (_idbErr) {
           console.warn('saveFileToIDB failed', _idbErr);
         }
