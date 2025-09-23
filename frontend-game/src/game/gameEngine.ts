@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { getChartFromIDB } from '../lib/idbAudio';
+import { getChartFromIDB, getFileBlobFromIDB, getSongsIndex } from '../lib/idbAudio';
 
 export interface Note {
   id: string;
@@ -222,28 +222,73 @@ export class GameEngine {
   }
   
   private playMusic(songId: string) {
-    this.audioElement = new Audio(`/songs/${songId}/song.mp3`);
-    this.audioElement.volume = 1; // use gainNode for master volume control
-    
-    // Connect to Web Audio API
-    if (this.audioContext.state === 'suspended') {
-      this.audioContext.resume();
+    // Clean up previous audio
+    if (this.audioElement) {
+      try { this.audioElement.pause(); } catch { /* ignore */ }
+      try { if (this.audioElement.src && this.audioElement.src.startsWith('blob:')) URL.revokeObjectURL(this.audioElement.src); } catch { /* ignore */ }
+      this.audioElement.src = '';
+      this.audioElement = null;
     }
-    
-    const source = this.audioContext.createMediaElementSource(this.audioElement);
-    source.connect(this.gainNode);
-    this.gainNode.connect(this.audioContext.destination);
-    
-    this.audioElement.play().then(() => {
-      console.log('MusicPlay', { songId, t0: this.audioContext.currentTime });
-    }).catch(err => {
-      console.warn('Music playback failed:', err);
-    });
-    
-    this.audioElement.addEventListener('ended', () => {
-      console.log('MusicEnd', { songId });
-    });
 
+    // We prefer audio stored in IndexedDB for client-only uploads. If not found,
+    // fall back to server-hosted files (try .ogg then .mp3).
+    const fallbackUrls = [`/songs/${songId}/song.ogg`, `/songs/${songId}/song.mp3`];
+    let usingBlobUrl = false;
+
+    const createAndConnect = (url: string) => {
+      this.audioElement = new Audio(url);
+      this.audioElement.volume = 1; // master volume via gainNode
+
+      // Connect to Web Audio API
+      if (this.audioContext.state === 'suspended') this.audioContext.resume();
+      try {
+        const source = this.audioContext.createMediaElementSource(this.audioElement);
+        source.connect(this.gainNode);
+        this.gainNode.connect(this.audioContext.destination);
+      } catch {
+        // ignore - some browsers may restrict connect before play
+      }
+
+      this.audioElement.addEventListener('ended', () => {
+        console.log('MusicEnd', { songId });
+        if (usingBlobUrl && this.audioElement && this.audioElement.src.startsWith('blob:')) {
+          try { URL.revokeObjectURL(this.audioElement.src); } catch { /* ignore */ }
+        }
+      });
+
+      // On error, try next fallback URL
+      this.audioElement.addEventListener('error', async () => {
+        console.warn('Audio load error for', url);
+        if (usingBlobUrl) return; // if blob URL failed, don't attempt network fallbacks
+        const next = fallbackUrls.shift();
+        if (next) {
+          console.log('Trying next audio fallback:', next);
+          try { this.audioElement!.src = next; this.audioElement!.load(); await this.audioElement!.play(); } catch { /* will trigger error again */ }
+        } else {
+          console.warn('All audio fallbacks failed for', songId);
+        }
+      });
+
+      this.audioElement.play().then(() => {
+        console.log('MusicPlay', { songId, t0: this.audioContext.currentTime });
+      }).catch(err => {
+        console.warn('Music playback failed:', err);
+      });
+    };
+
+    (async () => {
+      try {
+        const blob = await getFileBlobFromIDB(songId);
+        const url = URL.createObjectURL(blob);
+        usingBlobUrl = true;
+        createAndConnect(url);
+      } catch {
+        // Not in IDB — try network fallbacks
+        createAndConnect(fallbackUrls.shift() as string);
+      }
+    })();
+
+    // Update chase speed; prefer IDB index if server manifest is not available
     this.updateChaseSpeedFromBpm(songId).catch(err => console.warn('BPMLookupFailed', err));
   }
 
@@ -258,7 +303,17 @@ export class GameEngine {
       this.MAN_CHASE_SPEED = bpm >= 140 ? 0.5 : 0.25;
       console.log('ChaseSpeedSet', { songId, bpm, MAN_CHASE_SPEED: this.MAN_CHASE_SPEED });
     } catch (err) {
-      console.warn('updateChaseSpeedFromBpm error', err);
+      // Try to read BPM from IDB songs index as a fallback when server manifest isn't reachable
+      try {
+        const local = await getSongsIndex();
+        const localSongs = (local as unknown[]).map((s: unknown) => s as { id: string; bpm?: number });
+        const entry = localSongs.find(s => s.id === songId);
+        const bpm = entry?.bpm ?? 120;
+        this.MAN_CHASE_SPEED = bpm >= 140 ? 0.5 : 0.25;
+        console.log('ChaseSpeedSet (from IDB)', { songId, bpm, MAN_CHASE_SPEED: this.MAN_CHASE_SPEED });
+      } catch (idbErr) {
+        console.warn('updateChaseSpeedFromBpm error', err, idbErr);
+      }
     }
   }
   
