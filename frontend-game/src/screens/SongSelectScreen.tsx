@@ -314,8 +314,10 @@ export const SongSelectScreen: React.FC = () => {
           await saveFileToIDB(safeId, uploadFile);
 
           const localEntry: Song = { id: safeId, title: (uploadFile.name || 'NEW SONG').replace(/\.[^/.]+$/, '').toUpperCase(), bpm: 120, difficulty: 'Medium' };
-          setSongs(prev => [...prev, localEntry]);
-          setSelectedSongIndex(songs.length);
+          const newList = [...songs, localEntry];
+          setSongs(newList);
+          try { await saveSongsIndex(newList); } catch { /* ignore */ }
+          setSelectedSongIndex(newList.length - 1);
           selectSong(localEntry);
 
           // If requesting chart generation and gemini hook is available, run it client-side
@@ -405,14 +407,19 @@ export const SongSelectScreen: React.FC = () => {
           }
         }
         
-        // Reload songs from the updated index.json
+        // Reload songs from the updated index.json. We capture the list we actually set
+        // so that when running on static hosts (where index.json fetch fails) we persist
+        // the correct, updated list into IndexedDB instead of accidentally saving a
+        // stale `songs` value.
+        let persistList: Song[] | undefined = undefined;
         try {
           const songsResponse = await fetch('/songs/index.json', { cache: 'no-cache' });
           if (songsResponse.ok) {
             const updatedSongs: Song[] = await songsResponse.json();
             setSongs(updatedSongs);
+            persistList = updatedSongs;
             // Find and select the new song
-            const newSongIndex = updatedSongs.findIndex(song => song.id === result.song.id);
+            const newSongIndex = updatedSongs.findIndex(s => s.id === result.song.id);
             if (newSongIndex >= 0) {
               setSelectedSongIndex(newSongIndex);
               selectSong(updatedSongs[newSongIndex]);
@@ -427,6 +434,7 @@ export const SongSelectScreen: React.FC = () => {
               const localEntry: Song = { id: result.song.id, title: result.song.title, bpm: result.song.bpm || 120, difficulty: result.song.difficulty || 'Medium' };
               const newList = [...songs, localEntry];
               setSongs(newList);
+              persistList = newList;
               try { await saveSongsIndex(newList); } catch { /* ignore */ }
               setSelectedSongIndex(newList.length - 1);
               selectSong(localEntry);
@@ -439,8 +447,10 @@ export const SongSelectScreen: React.FC = () => {
         // Also persist the uploaded file to IndexedDB for reliable playback (useful when hosting static on Vercel)
         try {
           if (uploadFile) await saveFileToIDB(result.song.id, uploadFile);
-          // Persist updated songs index to IDB so static hosts retain uploaded list
-          try { await saveSongsIndex(songs); } catch { /* ignore */ }
+          // Persist updated songs index to IDB so static hosts retain uploaded list. Use the
+          // captured persistList when available; otherwise fall back to current `songs`.
+          const toPersist = persistList ?? songs;
+          try { await saveSongsIndex(toPersist); } catch { /* ignore */ }
         } catch (_idbErr) {
           console.warn('saveFileToIDB failed', _idbErr);
         }
