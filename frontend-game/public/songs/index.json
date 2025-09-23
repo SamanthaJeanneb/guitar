@@ -34,5 +34,11 @@
     "title": "VIENNA",
     "bpm": 125,
     "difficulty": "Hard"
+  },
+  {
+    "id": "zhangshichao",
+    "title": "张士超你到底把我钥匙放在哪里了",
+    "bpm": 120,
+    "difficulty": "Hard"
   }
 ]
