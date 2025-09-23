@@ -2,7 +2,7 @@ import React from 'react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useGameStore, Song } from '../store/gameStore';
 import { useGeminiApi } from '../hooks/useGeminiApi';
-import { saveFileToIDB, getFileBlobFromIDB, saveChartToIDB } from '../lib/idbAudio';
+import { saveFileToIDB, getFileBlobFromIDB, saveChartToIDB, getSongsIndex, saveSongsIndex } from '../lib/idbAudio';
 
 interface Character {
   id: string;
@@ -150,8 +150,20 @@ export const SongSelectScreen: React.FC = () => {
           playPreview(data[0]);
         }
       } catch (e) {
-        console.warn('Failed to load songs manifest', e);
-        setSongs([]);
+        console.warn('Failed to load songs manifest, falling back to IDB', e);
+        try {
+          const local = await getSongsIndex();
+          const localSongs = (local as unknown[]).map((s: unknown) => s as Song);
+          setSongs(localSongs);
+          if (localSongs.length > 0 && !song) {
+            setSelectedSongIndex(0);
+            selectSong(localSongs[0]);
+            playPreview(localSongs[0]);
+          }
+        } catch (idbErr) {
+          console.warn('Failed to load songs from IDB', idbErr);
+          setSongs([]);
+        }
       }
     };
     loadSongs();
@@ -413,8 +425,10 @@ export const SongSelectScreen: React.FC = () => {
               await saveFileToIDB(result.song.id, uploadFile);
               // Add to local songs array so it's immediately selectable
               const localEntry: Song = { id: result.song.id, title: result.song.title, bpm: result.song.bpm || 120, difficulty: result.song.difficulty || 'Medium' };
-              setSongs(prev => [...prev, localEntry]);
-              setSelectedSongIndex(songs.length);
+              const newList = [...songs, localEntry];
+              setSongs(newList);
+              try { await saveSongsIndex(newList); } catch { /* ignore */ }
+              setSelectedSongIndex(newList.length - 1);
               selectSong(localEntry);
             }
           } catch (_idbErr) {
@@ -425,6 +439,8 @@ export const SongSelectScreen: React.FC = () => {
         // Also persist the uploaded file to IndexedDB for reliable playback (useful when hosting static on Vercel)
         try {
           if (uploadFile) await saveFileToIDB(result.song.id, uploadFile);
+          // Persist updated songs index to IDB so static hosts retain uploaded list
+          try { await saveSongsIndex(songs); } catch { /* ignore */ }
         } catch (_idbErr) {
           console.warn('saveFileToIDB failed', _idbErr);
         }

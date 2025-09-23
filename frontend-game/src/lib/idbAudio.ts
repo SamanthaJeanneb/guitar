@@ -81,3 +81,29 @@ export async function getChartFromIDB(key: string): Promise<string> {
   });
 }
 
+// Simple JSON index helpers stored under 'songs-index'
+export async function saveSongsIndex(index: unknown[]): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('files', 'readwrite');
+    tx.objectStore('files').put(JSON.stringify(index), 'songs-index');
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+export async function getSongsIndex(): Promise<unknown[]> {
+  const db = await openDb();
+  return new Promise<unknown[]>((resolve, reject) => {
+    const tx = db.transaction('files', 'readonly');
+    const get = tx.objectStore('files').get('songs-index');
+    get.onsuccess = () => {
+      const res = get.result as string | undefined;
+      db.close();
+      if (!res) return resolve([]);
+      try { resolve(JSON.parse(res)); } catch { resolve([]); }
+    };
+    get.onerror = () => { db.close(); reject(get.error); };
+  });
+}
+
