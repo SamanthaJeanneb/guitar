@@ -143,11 +143,32 @@ export const SongSelectScreen: React.FC = () => {
         const res = await fetch('/songs/index.json', { cache: 'no-cache' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: Song[] = await res.json();
-        setSongs(data);
-        if (data.length > 0 && !song) {
-          setSelectedSongIndex(0);
-          selectSong(data[0]);
-          playPreview(data[0]);
+        // Merge with any locally-saved songs in IDB so client uploads are preserved
+        try {
+          const local = await getSongsIndex();
+          const localSongs = (local as unknown[]).map((s: unknown) => s as Song);
+          // Build map of server IDs
+          const serverIds = new Set(data.map(d => d.id));
+          const extras = localSongs.filter(ls => !serverIds.has(ls.id));
+          const merged = extras.length > 0 ? [...data, ...extras] : data;
+          setSongs(merged);
+          console.log('Merged server songs with IDB:', merged);
+          // Persist merged list to IDB so uploads remain visible even if server manifest exists
+          try { await saveSongsIndex(merged); } catch { /* ignore */ }
+          if (merged.length > 0 && !song) {
+            setSelectedSongIndex(0);
+            selectSong(merged[0]);
+            playPreview(merged[0]);
+          }
+        } catch {
+          // If IDB read fails, fall back to server data alone
+          console.warn('Failed to merge with IDB songs, using server list');
+          setSongs(data);
+          if (data.length > 0 && !song) {
+            setSelectedSongIndex(0);
+            selectSong(data[0]);
+            playPreview(data[0]);
+          }
         }
       } catch (e) {
         console.warn('Failed to load songs manifest, falling back to IDB', e);
